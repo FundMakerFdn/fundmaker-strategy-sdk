@@ -13,10 +13,10 @@ yarn migrate   # create the local db
 
 Next, you can edit `src/config.js` to set the settings you need. After, you can use the command below:
 
-### `yarn start`
+### `yarn start` / `node src/index.js`
 
 Fetch the data in the period specified in the configuration file. May take some time for large periods.
 
-### `yarn simulate`
+### `yarn simulate` / `node src/simulate.js`
 
 Simulate the position & fees for the period specified in the configuration file.
