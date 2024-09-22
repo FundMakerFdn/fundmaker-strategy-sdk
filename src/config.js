@@ -8,6 +8,8 @@ const CONFIG = {
   END_DATE: new Date("2024-09-15T11:15:00.000Z"),
   BATCH_SIZE: 1000,
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
+
+  SHOW_SIMULATION_PROGRESS: true, // print a dot for each hour simulated
 };
 
 CONFIG.position = {

@@ -6,6 +6,7 @@ import {
   getTokensAmountFromDepositAmountUSD,
   getLiquidityDelta,
   estimateFee,
+  encodeSqrtPriceX96,
 } from "./uniswap-math.js";
 import {
   getPrice,
@@ -16,12 +17,17 @@ import {
 import bn from "bignumber.js";
 import { mm } from "./misc-utils.js";
 
-async function getDecodedPrice(pool, timestamp) {
+async function getDecodedPriceAt(pool, timestamp) {
   return expandDecimals(
     decodeSqrtPriceX96(await getPrice(pool.id, timestamp)),
     pool.token0Decimals - pool.token1Decimals
   );
 }
+
+const encodePriceDec = (price, pool) =>
+  encodeSqrtPriceX96(
+    expandDecimals(price, pool.token1Decimals - pool.token0Decimals)
+  );
 
 function printPosition(pool, [amount0, amount1]) {
   console.log(`Position ${pool.token0Symbol}: ${amount0}`);
@@ -34,8 +40,9 @@ export async function simulatePosition(position) {
 
   const openPrice = position.openPrice
     ? p(position.openPrice)
-    : await getDecodedPrice(pool, position.openTime);
+    : await getDecodedPriceAt(pool, position.openTime);
 
+  console.log("Position value (USD):", position.amountUSD);
   // when print, invert the price again to
   // show the user the expected format
   console.log("Entry price:", p(openPrice));
@@ -59,14 +66,25 @@ export async function simulatePosition(position) {
     pool.token1Decimals
   );
 
+  console.log("openTime:", position.openTime);
+  console.log("closeTime:", position.closeTime);
+  console.log("Calculating fees");
+
   const feeBlocks = await processIntervals(
     (liq, vol) => {
       return estimateFee(deltaL, liq, vol, pool.feeTier);
     },
     pool.id,
     position.openTime,
-    position.closeTime
+    position.closeTime,
+    ...mm(
+      encodePriceDec(p(position.priceLow), pool),
+      encodePriceDec(p(position.priceHigh), pool)
+    )
   );
+
+  // print new line after the dots
+  if (CONFIG.SHOW_SIMULATION_PROGRESS) console.log("");
 
   const feesCollected = bn.sum(...feeBlocks).toNumber();
 
@@ -77,7 +95,7 @@ export async function simulatePosition(position) {
 
   const closePrice = position.closePrice
     ? p(position.closePrice)
-    : await getDecodedPrice(pool, position.closeTime);
+    : await getDecodedPriceAt(pool, position.closeTime);
 
   console.log("Exit price:", p(closePrice));
 
