@@ -11,7 +11,14 @@ yarn generate  # generate drizzle migrations
 yarn migrate   # create the local db
 ```
 
-Next, you can edit `src/config.js` to set the settings you need. After, you can use the command below:
+Next, you can edit `.env` and `src/config.js` to set the settings you need.
+
+### .env example
+```
+UNISWAP_V3_SUBGRAPH_URL="https://gateway-arbitrum.network.thegraph.com/api/..."
+```
+
+After, you can use the commands below:
 
 ### `yarn start`
 
