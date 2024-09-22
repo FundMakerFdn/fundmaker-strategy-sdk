@@ -7,7 +7,7 @@ import {
   queryPoolTrades,
   queryPoolLiquidity,
 } from "./graphql.js";
-import { getPoolMetadata } from "./db-utils.js";
+import { getPoolMetadata, batchInsert } from "./db-utils.js";
 import { handle } from "./misc-utils.js";
 
 // Function to save pool metadata
@@ -40,21 +40,20 @@ export async function savePoolMetadata(pool) {
 // Function to save trades to the database
 export async function saveTradesToDatabase(tradesData, poolId) {
   try {
-    await db
-      .insert(trades)
-      .values(
-        tradesData.map((trade) => ({
-          txid: trade.id,
-          timestamp: parseInt(trade.timestamp),
-          pool_id: poolId,
-          amount0: trade.amount0,
-          amount1: trade.amount1,
-          amountUSD: trade.amountUSD,
-          sqrtPriceX96: trade.sqrtPriceX96,
-          tick: trade.tick,
-        }))
-      )
-      .onConflictDoNothing();
+    await batchInsert(
+      db,
+      trades,
+      tradesData.map((trade) => ({
+        txid: trade.id,
+        timestamp: parseInt(trade.timestamp),
+        pool_id: poolId,
+        amount0: trade.amount0,
+        amount1: trade.amount1,
+        amountUSD: trade.amountUSD,
+        sqrtPriceX96: trade.sqrtPriceX96,
+        tick: trade.tick,
+      }))
+    );
   } catch (err) {
     console.error("Error saving trades:", err.message);
     throw err;
@@ -63,16 +62,15 @@ export async function saveTradesToDatabase(tradesData, poolId) {
 
 export async function saveLiquidityToDatabase(liquidityData, poolId) {
   try {
-    await db
-      .insert(liquidity)
-      .values(
-        liquidityData.map((liquidityPoint) => ({
-          pool_id: poolId,
-          timestamp: parseInt(liquidityPoint.periodStartUnix * 1000),
-          liquidity: liquidityPoint.liquidity,
-        }))
-      )
-      .onConflictDoNothing();
+    await batchInsert(
+      db,
+      liquidity,
+      liquidityData.map((liquidityPoint) => ({
+        pool_id: poolId,
+        timestamp: parseInt(liquidityPoint.periodStartUnix * 1000),
+        liquidity: liquidityPoint.liquidity,
+      }))
+    );
   } catch (err) {
     console.error("Error saving liquidity data:", err.message);
     throw err;
