@@ -298,3 +298,13 @@ export const expandDecimals = (n, exp) => {
 const mulDiv = (a, b, multiplier) => {
   return a.multipliedBy(b).div(multiplier);
 };
+
+export const calculateImpermanentLoss = (P_current, P_initial) => {
+  const sqrtP_current = Math.sqrt(P_current);
+  const sqrtP_initial = Math.sqrt(P_initial);
+
+  const impermanentLoss =
+    1 - (2 * sqrtP_current) / (sqrtP_current + sqrtP_initial);
+
+  return impermanentLoss;
+};

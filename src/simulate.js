@@ -7,6 +7,7 @@ import {
   getLiquidityDelta,
   estimateFee,
   encodeSqrtPriceX96,
+  calculateImpermanentLoss,
 } from "./uniswap-math.js";
 import {
   getPrice,
@@ -90,14 +91,22 @@ export async function simulatePosition(position) {
 
   console.log("Fees collected by position (USD):", feesCollected);
 
-  const newAmountUSD = position.amountUSD + feesCollected;
-  console.log("Position value at closeTime (USD):", newAmountUSD);
-
   const closePrice = position.closePrice
     ? p(position.closePrice)
     : await getDecodedPriceAt(pool, position.closeTime);
 
   console.log("Exit price:", p(closePrice));
+
+  const impermanentLoss = calculateImpermanentLoss(closePrice, openPrice);
+  const newAmountUSD =
+    position.amountUSD * (1 + impermanentLoss) + feesCollected;
+
+  console.log(
+    "Impermanent loss (%):",
+    // Display with 0.01% precision
+    Math.round(impermanentLoss * 100 * 100) / 100
+  );
+  console.log("Position value after IL:", newAmountUSD);
 
   const { amount0: newAmount0, amount1: newAmount1 } =
     getTokensAmountFromDepositAmountUSD(
