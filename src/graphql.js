@@ -145,7 +145,7 @@ export async function queryPoolLiquidity(
     if (response?.data?.data?.poolHourDatas) {
       const liquidityData = response.data.data.poolHourDatas;
       if (liquidityData.length === CONFIG.BATCH_SIZE) {
-        console.log(`Fetched {CONFIG.BATCH_SIZE} datapoints.`);
+        console.log(`Fetched ${CONFIG.BATCH_SIZE} datapoints.`);
         await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
         return queryPoolLiquidity(
           poolAddress,
