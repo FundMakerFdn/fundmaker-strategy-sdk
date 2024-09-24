@@ -2,15 +2,10 @@ import CONFIG from "#src/config.js";
 import db from "#src/database.js";
 import { pools, trades, liquidity } from "#src/schema.js";
 import { eq } from "drizzle-orm";
-import {
-  queryPoolMetadata,
-  queryPoolTrades,
-  queryPoolLiquidity,
-} from "./uniswapv3/graphql.js";
+import q from "./graphql.js";
 import { getPoolMetadata, batchInsert } from "#src/db-utils.js";
 import { handle } from "#src/misc-utils.js";
 
-// Function to save pool metadata
 export async function savePoolMetadata(poolType, pool) {
   try {
     const rows = await db
@@ -38,7 +33,6 @@ export async function savePoolMetadata(poolType, pool) {
   }
 }
 
-// Function to save trades to the database
 export async function saveTradesToDatabase(tradesData, poolId) {
   try {
     await batchInsert(db, trades, tradesData);
@@ -70,7 +64,7 @@ export async function fetchPool(poolType, poolAddress) {
 
   if (!poolId) {
     console.log(`Fetching metadata for ${poolType} pool ${poolAddress}`);
-    const poolMetadata = await queryPoolMetadata(poolAddress);
+    const poolMetadata = await q[poolType].queryPoolMetadata(poolAddress);
     if (poolMetadata) {
       poolId = await savePoolMetadata(poolType, poolMetadata);
       if (!poolId) {
@@ -84,14 +78,13 @@ export async function fetchPool(poolType, poolAddress) {
   return poolId;
 }
 
-// Main function to fetch and store daily trades and liquidity
-export async function fetchDailyTrades(poolId, startDate, endDate) {
+export async function fetchDailyTrades(poolType, poolId, startDate, endDate) {
   let totalCount = 0;
 
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
-  const trades = await queryPoolTrades(
+  const trades = await q[poolType].queryPoolTrades(
     CONFIG.POOL_ADDRESS,
     startTimestamp,
     endTimestamp,
@@ -123,12 +116,11 @@ export async function fetchDailyTrades(poolId, startDate, endDate) {
   );
 }
 
-// Helper function to fetch and store liquidity for a given pool
-export async function fetchLiquidity(poolId, startDate, endDate) {
+export async function fetchLiquidity(poolType, poolId, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
-  const liquidityData = await queryPoolLiquidity(
+  const liquidityData = await q[poolType].queryPoolLiquidity(
     CONFIG.POOL_ADDRESS,
     startTimestamp,
     endTimestamp,

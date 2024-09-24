@@ -10,11 +10,7 @@ const Q128 = new bn(2).pow(128);
 const ZERO = new bn(0);
 
 export const getFeeTierPercentage = function (tier) {
-  if (tier === "100") return 0.01 / 100;
-  if (tier === "500") return 0.05 / 100;
-  if (tier === "3000") return 0.3 / 100;
-  if (tier === "10000") return 1 / 100;
-  return 0;
+  return Number(tier) / 1000000;
 };
 
 // The function to analyze onchain positions

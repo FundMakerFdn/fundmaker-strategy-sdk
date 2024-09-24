@@ -148,6 +148,9 @@ export const processIntervals = handle(
 
 export async function batchInsert(db, table, items, chunkSize = 999) {
   for (let i = 0; i < items.length; i += chunkSize) {
-    await db.insert(table).values(items.slice(i, i + chunkSize));
+    await db
+      .insert(table)
+      .values(items.slice(i, i + chunkSize))
+      .onConflictDoNothing();
   }
 }

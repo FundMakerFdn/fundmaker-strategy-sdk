@@ -2,7 +2,7 @@ import axios from "axios";
 import CONFIG from "#src/config.js";
 import { delay } from "#src/misc-utils.js";
 
-const SUBGRAPH_URL = CONFIG.SUBGRAPH_URLS.uniswapv3;
+const SUBGRAPH_URL = CONFIG.SUBGRAPH_URLS.thena;
 
 export async function queryPoolMetadata(poolAddress) {
   const query = `
@@ -17,7 +17,7 @@ export async function queryPoolMetadata(poolAddress) {
           symbol
           decimals
         }
-        feeTier
+        fee
       }
     }
   `;
@@ -27,7 +27,10 @@ export async function queryPoolMetadata(poolAddress) {
       query,
     });
     if (response.data && response.data.data && response.data.data.pool) {
-      return response.data.data.pool;
+      // Thena schema adjustments
+      const pool = response.data.data.pool;
+      pool.feeTier = pool.fee;
+      return pool;
     } else {
       console.error(
         "Unexpected response structure for pool metadata:",
@@ -67,7 +70,7 @@ export async function queryPoolTrades(
         amount0
         amount1
         amountUSD
-        sqrtPriceX96
+        sqrtPriceX96:price
         tick
       }
     }

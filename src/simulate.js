@@ -8,7 +8,7 @@ import {
   estimateFee,
   encodeSqrtPriceX96,
   calculateImpermanentLoss,
-} from "./uniswapv3/math.js";
+} from "./pool-math.js";
 import {
   getPrice,
   getPoolMetadata,
@@ -118,6 +118,9 @@ export async function simulatePosition(position) {
     );
 
   printPosition(pool, [newAmount0, newAmount1]);
+
+  const diffAmount = newAmountUSD - position.amountUSD;
+  console.log("Total PnL (USD):", diffAmount);
 }
 
 simulatePosition(CONFIG.position);

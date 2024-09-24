@@ -2,15 +2,18 @@ import { config } from "dotenv";
 config();
 
 const CONFIG = {
-  UNISWAP_V3_SUBGRAPH_URL: process.env.UNISWAP_V3_SUBGRAPH_URL,
   POOL_ADDRESS: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
   POOL_TYPE: "uniswapv3", // uniswapv3, thena
   START_DATE: new Date("2024-09-14T17:10:00.000Z"), // data fetch start date
   END_DATE: new Date("2024-09-15T11:15:00.000Z"), // data fetch end date
   BATCH_SIZE: 1000,
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
-
   SHOW_SIMULATION_PROGRESS: true, // print a dot for each hour simulated
+
+  SUBGRAPH_URLS: {
+    uniswapv3: process.env.UNISWAP_V3_SUBGRAPH_URL,
+    thena: process.env.THENA_SUBGRAPH_URL,
+  },
 };
 
 CONFIG.position = {
