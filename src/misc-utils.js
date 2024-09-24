@@ -13,3 +13,4 @@ export const handle = (func, errStr) => {
     }
   };
 };
+

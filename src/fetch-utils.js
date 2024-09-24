@@ -1,14 +1,14 @@
-import CONFIG from "./config.js";
-import db from "./database.js";
-import { pools, trades, liquidity } from "./schema.js";
+import CONFIG from "#src/config.js";
+import db from "#src/database.js";
+import { pools, trades, liquidity } from "#src/schema.js";
 import { eq } from "drizzle-orm";
 import {
   queryPoolMetadata,
   queryPoolTrades,
   queryPoolLiquidity,
-} from "./graphql.js";
-import { getPoolMetadata, batchInsert } from "./db-utils.js";
-import { handle } from "./misc-utils.js";
+} from "./uniswapv3/graphql.js";
+import { getPoolMetadata, batchInsert } from "#src/db-utils.js";
+import { handle } from "#src/misc-utils.js";
 
 // Function to save pool metadata
 export async function savePoolMetadata(pool) {
@@ -40,20 +40,7 @@ export async function savePoolMetadata(pool) {
 // Function to save trades to the database
 export async function saveTradesToDatabase(tradesData, poolId) {
   try {
-    await batchInsert(
-      db,
-      trades,
-      tradesData.map((trade) => ({
-        txid: trade.id,
-        timestamp: parseInt(trade.timestamp),
-        pool_id: poolId,
-        amount0: trade.amount0,
-        amount1: trade.amount1,
-        amountUSD: trade.amountUSD,
-        sqrtPriceX96: trade.sqrtPriceX96,
-        tick: trade.tick,
-      }))
-    );
+    await batchInsert(db, trades, tradesData);
   } catch (err) {
     console.error("Error saving trades:", err.message);
     throw err;
@@ -112,8 +99,9 @@ export async function fetchDailyTrades(poolId, startDate, endDate) {
 
   const formattedTrades = trades.map((trade) => {
     return {
-      id: trade.id,
-      timestamp: (parseInt(trade.timestamp) * 1000).toString(),
+      pool_id: poolId,
+      txid: trade.id,
+      timestamp: parseInt(trade.timestamp) * 1000,
       amount0: trade.amount0,
       amount1: trade.amount1,
       amountUSD: trade.amountUSD,

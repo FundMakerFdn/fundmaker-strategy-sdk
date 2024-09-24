@@ -1,6 +1,6 @@
 import axios from "axios";
-import CONFIG from "./config.js";
-import { delay } from "./misc-utils.js";
+import CONFIG from "#src/config.js";
+import { delay } from "#src/misc-utils.js";
 
 // Function to get pool metadata (unchanged)
 export async function queryPoolMetadata(poolAddress) {

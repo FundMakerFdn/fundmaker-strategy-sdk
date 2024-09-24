@@ -8,7 +8,7 @@ import {
   estimateFee,
   encodeSqrtPriceX96,
   calculateImpermanentLoss,
-} from "./uniswap-math.js";
+} from "./uniswapv3/math.js";
 import {
   getPrice,
   getPoolMetadata,
@@ -106,7 +106,7 @@ export async function simulatePosition(position) {
     // Display with 0.01% precision
     Math.round(impermanentLoss * 100 * 100) / 100
   );
-  console.log("Position value after IL:", newAmountUSD);
+  console.log("Position value after IL (USD):", newAmountUSD);
 
   const { amount0: newAmount0, amount1: newAmount1 } =
     getTokensAmountFromDepositAmountUSD(
