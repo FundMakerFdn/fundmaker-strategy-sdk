@@ -1,10 +1,12 @@
 import CONFIG from "#src/config.js";
 import db from "#src/database.js";
 import { pools, trades, liquidity } from "#src/schema.js";
-import { eq } from "drizzle-orm";
-import q from "./graphql.js";
+import {
+  queryPoolMetadata,
+  queryPoolTrades,
+  queryPoolLiquidity,
+} from "./graphql.js";
 import { getPoolMetadata, batchInsert } from "#src/db-utils.js";
-import { handle } from "#src/misc-utils.js";
 
 export async function savePoolMetadata(poolType, pool) {
   try {
@@ -64,7 +66,7 @@ export async function fetchPool(poolType, poolAddress) {
 
   if (!poolId) {
     console.log(`Fetching metadata for ${poolType} pool ${poolAddress}`);
-    const poolMetadata = await q[poolType].queryPoolMetadata(poolAddress);
+    const poolMetadata = await queryPoolMetadata(poolType, poolAddress);
     if (poolMetadata) {
       poolId = await savePoolMetadata(poolType, poolMetadata);
       if (!poolId) {
@@ -84,7 +86,8 @@ export async function fetchDailyTrades(poolType, poolId, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
-  const trades = await q[poolType].queryPoolTrades(
+  const trades = await queryPoolTrades(
+    poolType,
     CONFIG.POOL_ADDRESS,
     startTimestamp,
     endTimestamp,
@@ -120,7 +123,8 @@ export async function fetchLiquidity(poolType, poolId, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
-  const liquidityData = await q[poolType].queryPoolLiquidity(
+  const liquidityData = await queryPoolLiquidity(
+    poolType,
     CONFIG.POOL_ADDRESS,
     startTimestamp,
     endTimestamp,
