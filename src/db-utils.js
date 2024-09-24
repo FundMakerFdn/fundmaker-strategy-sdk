@@ -4,11 +4,11 @@ import { sql, and, eq, between } from "drizzle-orm";
 import { handle } from "./misc-utils.js";
 import CONFIG from "./config.js";
 
-export const getPoolMetadata = handle(async (poolAddress) => {
+export const getPoolMetadata = handle(async (poolType, poolAddress) => {
   const rows = await db
     .select()
     .from(pools)
-    .where(eq(pools.address, poolAddress))
+    .where(and(eq(pools.type, poolType), eq(pools.address, poolAddress)))
     .limit(1);
   return rows[0];
 }, "reading pool metadata");

@@ -4,7 +4,7 @@ import CONFIG from "./config.js";
 async function main() {
   let currentDate = new Date(CONFIG.START_DATE);
 
-  const poolId = await fetchPool(CONFIG.POOL_ADDRESS);
+  const poolId = await fetchPool(CONFIG.POOL_TYPE, CONFIG.POOL_ADDRESS);
 
   // Loop through each day until the end date
   while (currentDate < CONFIG.END_DATE) {
@@ -20,7 +20,7 @@ async function main() {
     currentDate = nextDate;
   }
 
-  console.log("All dates processed.");
+  console.log("Fetched trades.");
   console.log("Fetching liquidity...");
 
   fetchLiquidity(poolId, CONFIG.START_DATE, CONFIG.END_DATE);

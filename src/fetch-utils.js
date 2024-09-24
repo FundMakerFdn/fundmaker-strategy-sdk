@@ -11,7 +11,7 @@ import { getPoolMetadata, batchInsert } from "#src/db-utils.js";
 import { handle } from "#src/misc-utils.js";
 
 // Function to save pool metadata
-export async function savePoolMetadata(pool) {
+export async function savePoolMetadata(poolType, pool) {
   try {
     const rows = await db
       .insert(pools)
@@ -20,7 +20,8 @@ export async function savePoolMetadata(pool) {
         token1Symbol: pool.token1.symbol,
         token0Decimals: pool.token0.decimals,
         token1Decimals: pool.token1.decimals,
-        address: CONFIG.POOL_ADDRESS,
+        type: poolType,
+        address: pool.id,
         feeTier: pool.feeTier, // Saving the feeTier in the pool table
       })
       .onConflictDoNothing()
@@ -64,17 +65,17 @@ export async function saveLiquidityToDatabase(liquidityData, poolId) {
   }
 }
 
-export async function fetchPool(address) {
-  let poolId = (await getPoolMetadata(CONFIG.POOL_ADDRESS))?.id;
+export async function fetchPool(poolType, poolAddress) {
+  let poolId = (await getPoolMetadata(poolType, poolAddress))?.id;
 
   if (!poolId) {
-    console.log(`Fetching metadata for pool ${CONFIG.POOL_ADDRESS}`);
-    const poolMetadata = await queryPoolMetadata(CONFIG.POOL_ADDRESS);
+    console.log(`Fetching metadata for ${poolType} pool ${poolAddress}`);
+    const poolMetadata = await queryPoolMetadata(poolAddress);
     if (poolMetadata) {
-      poolId = await savePoolMetadata(poolMetadata);
+      poolId = await savePoolMetadata(poolType, poolMetadata);
       if (!poolId) {
         console.error(
-          `Failed to save pool metadata for ${CONFIG.POOL_ADDRESS}`
+          `Failed to save pool metadata for ${poolType} pool ${poolAddress}`
         );
         return;
       }

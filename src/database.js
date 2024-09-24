@@ -11,7 +11,7 @@ import {
 import * as schema from "./schema.js";
 
 // Initialize SQLite connection
-const sqlite = new Database("uniswap.db");
+const sqlite = new Database("data.db");
 
 // Initialize Drizzle ORM with SQLite connection
 const db = drizzle(sqlite);

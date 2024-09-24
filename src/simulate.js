@@ -37,7 +37,7 @@ function printPosition(pool, [amount0, amount1]) {
 
 export async function simulatePosition(position) {
   const p = position.invPrices ? (p) => 1 / p : (p) => p;
-  const pool = await getPoolMetadata(position.poolAddress);
+  const pool = await getPoolMetadata(position.poolType, position.poolAddress);
 
   const openPrice = position.openPrice
     ? p(position.openPrice)

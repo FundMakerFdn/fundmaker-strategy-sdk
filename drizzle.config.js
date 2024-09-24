@@ -5,6 +5,6 @@ export default defineConfig({
   schema: "./src/schema.js",
   out: "./drizzle",
   dbCredentials: {
-    url: "./uniswap.db",
+    url: "./data.db",
   },
 });

@@ -4,9 +4,9 @@ config();
 const CONFIG = {
   UNISWAP_V3_SUBGRAPH_URL: process.env.UNISWAP_V3_SUBGRAPH_URL,
   POOL_ADDRESS: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
-  //START_DATE: new Date("2024-01-01T01:00:00.000Z"),
-  START_DATE: new Date("2024-09-14T17:10:00.000Z"),
-  END_DATE: new Date("2024-09-15T11:15:00.000Z"),
+  POOL_TYPE: "uniswapv3", // uniswapv3, thena
+  START_DATE: new Date("2024-09-14T17:10:00.000Z"), // data fetch start date
+  END_DATE: new Date("2024-09-15T11:15:00.000Z"), // data fetch end date
   BATCH_SIZE: 1000,
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
 
@@ -23,6 +23,7 @@ CONFIG.position = {
   openTime: CONFIG.START_DATE,
   closeTime: CONFIG.END_DATE,
   poolAddress: CONFIG.POOL_ADDRESS,
+  poolType: CONFIG.POOL_TYPE,
 };
 
 export default CONFIG;
