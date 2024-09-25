@@ -89,7 +89,8 @@ export async function queryPoolLiquidity(
   poolAddress,
   startTimestamp,
   endTimestamp,
-  skip
+  skip = 0,
+  liquidityData = []
 ) {
   try {
     const query = q[poolType].poolLiquidityGraphQL(
@@ -101,9 +102,9 @@ export async function queryPoolLiquidity(
     const response = await axios.post(getSubgraphURL(poolType), {
       query,
     });
-
     if (response?.data?.data?.poolHourDatas) {
-      const liquidityData = response.data.data.poolHourDatas;
+      const newData = response.data.data.poolHourDatas;
+      const allData = liquidityData.concat(newData);
       if (liquidityData.length === CONFIG.BATCH_SIZE) {
         console.log(`Fetched ${CONFIG.BATCH_SIZE} datapoints.`);
         await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
@@ -112,10 +113,11 @@ export async function queryPoolLiquidity(
           poolAddress,
           startTimestamp,
           endTimestamp,
-          skip + CONFIG.BATCH_SIZE
+          skip + CONFIG.BATCH_SIZE,
+          newData
         );
       }
-      return response.data.data.poolHourDatas;
+      return allData;
     } else {
       console.error(
         "Unexpected response structure for hourly liquidity data:",
@@ -132,30 +134,55 @@ export async function queryPoolLiquidity(
   }
 }
 
-export async function queryPoolAddress(poolType, ...args) {
+export async function queryPoolFeeTiers(
+  poolType,
+  poolAddress,
+  startTimestamp,
+  endTimestamp,
+  skip = 0,
+  feeTierData = []
+) {
   try {
-    const query = q[poolType].findPoolGraphQL(...args);
+    const query = q[poolType].poolFeeTiersGraphQL(
+      poolAddress,
+      startTimestamp,
+      endTimestamp,
+      skip
+    );
     const response = await axios.post(getSubgraphURL(poolType), {
       query,
     });
-    if (response?.data?.data?.pools) {
-      const pools = response?.data?.data?.pools;
-      if (pools.length === 0) return null;
-      else return pools[0].id;
+    if (response?.data?.data?.feeHourDatas) {
+      const newData = response.data.data.feeHourDatas;
+      const allData = feeTierData.concat(newData);
+      if (feeTierData.length === CONFIG.BATCH_SIZE) {
+        console.log(`Fetched ${CONFIG.BATCH_SIZE} datapoints.`);
+        await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
+        return queryPoolFeeTiers(
+          poolType,
+          poolAddress,
+          startTimestamp,
+          endTimestamp,
+          skip + CONFIG.BATCH_SIZE,
+          newData
+        );
+      }
+      return allData.map((datapoint) => ({
+        ...datapoint,
+        feeTier: (Number(datapoint.minFee) + Number(datapoint.maxFee)) / 2,
+      }));
     } else {
       console.error(
-        "Unexpected response structure for pool metadata:",
+        "Unexpected response structure for hourly feeTier data:",
         response.data
       );
-      return null;
+      return [];
     }
   } catch (error) {
-    console.error("Error fetching hourly liquidity data:", error.message);
+    console.error("Error fetching hourly feeTier data:", error.message);
     if (error.response) {
       console.error("Error response:", error.response.data);
     }
     return [];
   }
 }
-
-export default q;

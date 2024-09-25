@@ -2,8 +2,8 @@ import { config } from "dotenv";
 config();
 
 const CONFIG = {
-  POOL_ADDRESS: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
-  POOL_TYPE: "uniswapv3", // uniswapv3, thena
+  POOL_ADDRESS: "0xd405b976ac01023c9064024880999fc450a8668b",
+  POOL_TYPE: "thena", // uniswapv3, thena
   START_DATE: new Date("2024-09-14T17:10:00.000Z"), // data fetch start date
   END_DATE: new Date("2024-09-15T11:15:00.000Z"), // data fetch end date
   BATCH_SIZE: 1000,
@@ -14,15 +14,18 @@ const CONFIG = {
     uniswapv3: process.env.UNISWAP_V3_SUBGRAPH_URL,
     thena: process.env.THENA_SUBGRAPH_URL,
   },
+
+  // Pools with dynamic fee tiers
+  DYNAMIC_FEE_POOLS: ["thena"],
 };
 
 CONFIG.position = {
   invPrices: true, // true for USDC/WETH, false for WETH/USDC
-  openPrice: 2414.3175, // if null, detects from openTime
+  openPrice: null, // if null, detects from openTime
   closePrice: null, // if null, detects from closeTime
-  amountUSD: 51.78,
-  priceHigh: 2418.7668,
-  priceLow: 2411.5217,
+  amountUSD: 100,
+  priceHigh: 545,
+  priceLow: 555,
   openTime: CONFIG.START_DATE,
   closeTime: CONFIG.END_DATE,
   poolAddress: CONFIG.POOL_ADDRESS,

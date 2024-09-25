@@ -20,7 +20,7 @@ export const poolTradesGraphQL = (
   poolAddress,
   startTimestamp,
   endTimestamp,
-  skip
+  skip = 0
 ) => `
     query {
       swaps(
@@ -48,7 +48,7 @@ export const poolLiquidityGraphQL = (
   poolAddress,
   startTimestamp,
   endTimestamp,
-  skip
+  skip = 0
 ) => `
     query {
       poolHourDatas(
@@ -66,6 +66,30 @@ export const poolLiquidityGraphQL = (
         liquidity
         volumeUSD
         feesUSD
+      }
+    }
+  `;
+export const poolFeeTiersGraphQL = (
+  poolAddress,
+  startTimestamp,
+  endTimestamp,
+  skip = 0
+) => `
+    query {
+      feeHourDatas(
+        where: {
+          pool: "${poolAddress}",
+          timestamp_gte: ${startTimestamp},
+          timestamp_lte: ${endTimestamp}
+        }
+        orderBy: timestamp
+        orderDirection: asc
+        first: ${CONFIG.BATCH_SIZE}
+        skip: ${skip}
+      ) {
+        timestamp
+        minFee
+        maxFee
       }
     }
   `;

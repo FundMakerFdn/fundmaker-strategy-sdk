@@ -1,4 +1,9 @@
-import { fetchPool, fetchDailyTrades, fetchLiquidity } from "./fetch-utils.js";
+import {
+  fetchPool,
+  fetchDailyTrades,
+  fetchLiquidity,
+  fetchFeeTiers,
+} from "./fetch-utils.js";
 import CONFIG from "./config.js";
 
 async function main() {
@@ -22,6 +27,11 @@ async function main() {
   console.log("Fetching liquidity...");
 
   fetchLiquidity(CONFIG.POOL_TYPE, poolId, CONFIG.START_DATE, CONFIG.END_DATE);
+
+  if (CONFIG.DYNAMIC_FEE_POOLS.includes(CONFIG.POOL_TYPE)) {
+    console.log("Fetching fee tiers...");
+    fetchFeeTiers(CONFIG.POOL_TYPE, poolId, CONFIG.START_DATE, CONFIG.END_DATE);
+  }
 }
 
 // Start the main function

@@ -102,7 +102,7 @@ export async function simulatePosition(position) {
     position.amountUSD * (1 + impermanentLoss) + feesCollected;
 
   console.log(
-    "Impermanent loss (%):",
+    "Impermanent loss PnL (%):",
     // Display with 0.01% precision
     Math.round(impermanentLoss * 100 * 100) / 100
   );

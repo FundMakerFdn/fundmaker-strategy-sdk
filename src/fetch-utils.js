@@ -1,10 +1,11 @@
 import CONFIG from "#src/config.js";
 import db from "#src/database.js";
-import { pools, trades, liquidity } from "#src/schema.js";
+import { pools, trades, liquidity, fee_tiers } from "#src/schema.js";
 import {
   queryPoolMetadata,
   queryPoolTrades,
   queryPoolLiquidity,
+  queryPoolFeeTiers,
 } from "./graphql.js";
 import { getPoolMetadata, batchInsert } from "#src/db-utils.js";
 
@@ -135,5 +136,34 @@ export async function fetchLiquidity(poolType, poolId, startDate, endDate) {
 
   console.log(
     `Finished fetching liquidity for ${startDate.toISOString()} to ${endDate.toISOString()}`
+  );
+}
+
+export async function saveFeeTiersToDatabase(feeTiersData, poolId) {
+  try {
+    await batchInsert(
+      db,
+      fee_tiers,
+      feeTiersData.map((datapoint) => ({ ...datapoint, pool_id: poolId }))
+    );
+  } catch (err) {
+    console.error("Error saving feeTiers data:", err.message);
+    throw err;
+  }
+}
+
+export async function fetchFeeTiers(poolType, poolId, startDate, endDate) {
+  const startTimestamp = Math.floor(startDate.getTime() / 1000);
+  const endTimestamp = Math.floor(endDate.getTime() / 1000);
+  const feeTiersData = await queryPoolFeeTiers(
+    poolType,
+    CONFIG.POOL_ADDRESS,
+    startTimestamp,
+    endTimestamp,
+    0
+  );
+  saveFeeTiersToDatabase(feeTiersData, poolId);
+  console.log(
+    `Finished fetching feeTiers for ${startDate.toISOString()} to ${endDate.toISOString()}`
   );
 }
