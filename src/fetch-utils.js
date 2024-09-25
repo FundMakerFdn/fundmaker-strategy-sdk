@@ -6,7 +6,7 @@ import {
   queryPoolTrades,
   queryPoolLiquidity,
   queryPoolFeeTiers,
-} from "./graphql.js";
+} from "#src/graphql.js";
 import { getPoolMetadata, batchInsert } from "#src/db-utils.js";
 
 export async function savePoolMetadata(poolType, pool) {
@@ -47,15 +47,7 @@ export async function saveTradesToDatabase(tradesData, poolId) {
 
 export async function saveLiquidityToDatabase(liquidityData, poolId) {
   try {
-    await batchInsert(
-      db,
-      liquidity,
-      liquidityData.map((liquidityPoint) => ({
-        pool_id: poolId,
-        timestamp: parseInt(liquidityPoint.periodStartUnix * 1000),
-        liquidity: liquidityPoint.liquidity,
-      }))
-    );
+    await batchInsert(db, liquidity, liquidityData);
   } catch (err) {
     console.error("Error saving liquidity data:", err.message);
     throw err;
@@ -99,7 +91,7 @@ export async function fetchDailyTrades(poolType, poolId, startDate, endDate) {
     return {
       pool_id: poolId,
       txid: trade.id,
-      timestamp: parseInt(trade.timestamp) * 1000,
+      timestamp: Number(trade.timestamp) * 1000,
       amount0: trade.amount0,
       amount1: trade.amount1,
       amountUSD: trade.amountUSD,
@@ -124,13 +116,18 @@ export async function fetchLiquidity(poolType, poolId, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
-  const liquidityData = await queryPoolLiquidity(
+  let liquidityData = await queryPoolLiquidity(
     poolType,
     CONFIG.POOL_ADDRESS,
     startTimestamp,
     endTimestamp,
     0
   );
+  liquidityData = liquidityData.map((liquidityPoint) => ({
+    pool_id: poolId,
+    timestamp: parseInt(liquidityPoint.periodStartUnix * 1000),
+    liquidity: liquidityPoint.liquidity,
+  }));
 
   saveLiquidityToDatabase(liquidityData, poolId);
 
@@ -141,11 +138,7 @@ export async function fetchLiquidity(poolType, poolId, startDate, endDate) {
 
 export async function saveFeeTiersToDatabase(feeTiersData, poolId) {
   try {
-    await batchInsert(
-      db,
-      fee_tiers,
-      feeTiersData.map((datapoint) => ({ ...datapoint, pool_id: poolId }))
-    );
+    await batchInsert(db, fee_tiers, feeTiersData);
   } catch (err) {
     console.error("Error saving feeTiers data:", err.message);
     throw err;
@@ -155,13 +148,18 @@ export async function saveFeeTiersToDatabase(feeTiersData, poolId) {
 export async function fetchFeeTiers(poolType, poolId, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
-  const feeTiersData = await queryPoolFeeTiers(
+  let feeTiersData = await queryPoolFeeTiers(
     poolType,
     CONFIG.POOL_ADDRESS,
     startTimestamp,
     endTimestamp,
     0
   );
+  feeTiersData = feeTiersData.map((hourFee) => ({
+    ...hourFee,
+    timestamp: Number(hourFee.timestamp) * 1000,
+    pool_id: poolId,
+  }));
   saveFeeTiersToDatabase(feeTiersData, poolId);
   console.log(
     `Finished fetching feeTiers for ${startDate.toISOString()} to ${endDate.toISOString()}`

@@ -1,5 +1,5 @@
 import db from "./database.js";
-import { pools, trades, liquidity } from "./schema.js";
+import { pools, trades, liquidity, fee_tiers } from "./schema.js";
 import { sql, and, eq, between } from "drizzle-orm";
 import { handle } from "./misc-utils.js";
 import CONFIG from "./config.js";
@@ -26,29 +26,37 @@ export const getPrice = handle(async (poolId, timestamp) => {
   return rows[0].sqrtPriceX96;
 }, "reading price from DB");
 
-export const getLiquidityBetween = handle(
-  async (poolId, startTimestamp, endTimestamp) => {
-    const rows = await db
-      .select({
-        liquidity: liquidity.liquidity,
-        timestamp: liquidity.timestamp,
-      })
-      .from(liquidity)
-      .where(
-        and(
-          eq(liquidity.pool_id, poolId),
-          between(
-            liquidity.timestamp,
-            startTimestamp.getTime(),
-            endTimestamp.getTime()
-          )
+export const getTableBetween = async (
+  table,
+  poolId,
+  startTimestamp,
+  endTimestamp
+) => {
+  const rows = await db
+    .select()
+    .from(table)
+    .where(
+      and(
+        eq(table.pool_id, poolId),
+        between(
+          table.timestamp,
+          startTimestamp.getTime(),
+          endTimestamp.getTime()
         )
       )
-      .orderBy(liquidity.timestamp); // Order the results by timestamp
+    )
+    .orderBy(table.timestamp);
 
-    return rows;
-  },
+  return rows;
+};
+
+export const getLiquidityBetween = handle(
+  async (...args) => getTableBetween(liquidity, ...args),
   "fetching liquidity points between timestamps"
+);
+export const getFeeTiersBetween = handle(
+  async (...args) => getTableBetween(fee_tiers, ...args),
+  "fetching fee tiers between timestamps"
 );
 
 export const sumTradeVolume = handle(
@@ -71,15 +79,24 @@ export const sumTradeVolume = handle(
         )
       );
 
-    return result[0]?.totalAmountUSD || 0; // Return the sum or 0 if no records
+    return result[0]?.totalAmountUSD || 0;
   },
   "summing volume"
 );
 
 export const processIntervals = handle(
-  async (calc, poolId, start, end, sqPriceX96Low, sqPriceX96High) => {
+  async (calc, pool, pos, sqPriceX96Low, sqPriceX96High) => {
     // Fetch liquidity timestamps between the start and end
-    const liquiditySteps = await getLiquidityBetween(poolId, start, end);
+    const liquiditySteps = await getLiquidityBetween(
+      pool.id,
+      pos.openTime,
+      pos.closeTime
+    );
+    const feeTierSteps = await getFeeTiersBetween(
+      pool.id,
+      pos.openTime,
+      pos.closeTime
+    );
 
     if (liquiditySteps.length === 0) {
       throw new Error(
@@ -87,13 +104,13 @@ export const processIntervals = handle(
       );
     }
 
-    // Initialize intervals, starting with the [start, first liquidity] interval
+    // Initialize intervals, starting with the [pos.openTime, first liquidity] interval
     let intervals = [];
 
-    // Add the first interval [start, liquiditySteps[0].timestamp] only if it's valid
-    if (liquiditySteps[0].timestamp > start) {
+    // Add the first interval [pos.openTime, liquiditySteps[0].timestamp] only if it's valid
+    if (liquiditySteps[0].timestamp > pos.openTime) {
       intervals.push({
-        start: start.getTime(),
+        start: pos.openTime.getTime(),
         end: liquiditySteps[0].timestamp,
       });
     }
@@ -106,42 +123,48 @@ export const processIntervals = handle(
       });
     }
 
-    // Add the last interval [last liquidity timestamp, end] if it's valid
-    if (liquiditySteps[liquiditySteps.length - 1].timestamp < end) {
+    // Add the last interval [last liquidity timestamp, pos.closeTime] if it's valid
+    if (liquiditySteps[liquiditySteps.length - 1].timestamp < pos.closeTime) {
       intervals.push({
         start: liquiditySteps[liquiditySteps.length - 1].timestamp,
-        end: end.getTime(),
+        end: pos.closeTime.getTime(),
       });
     }
 
-    const feeBlocks = [];
+    const hourlyReturns = [];
 
     // Process each interval
     for (const interval of intervals) {
       // Sum the trade volume in this interval
       const volume = await sumTradeVolume(
-        poolId,
+        pool.id,
         interval.start,
         interval.end,
         sqPriceX96Low,
         sqPriceX96High
       );
 
-      // If no volume was found, skip the interval
       if (!volume) continue;
 
-      // Get the liquidity at the start of this interval
       const intervalLiq = liquiditySteps.find(
         (liq) => liq.timestamp === interval.start
       )?.liquidity;
 
-      // Only call calc if we have both valid liquidity and volume
+      let intervalFeeTier;
+      if (CONFIG.DYNAMIC_FEE_POOLS.includes(pool.type)) {
+        intervalFeeTier = feeTierSteps.find(
+          (row) => row.timestamp === interval.start
+        )?.feeTier;
+      } else {
+        intervalFeeTier = pool.feeTier;
+      }
+
       if (intervalLiq != null && volume != null) {
-        feeBlocks.push(calc(intervalLiq, volume));
+        hourlyReturns.push(calc(intervalLiq, volume, intervalFeeTier));
       }
     }
 
-    return feeBlocks;
+    return hourlyReturns;
   },
   "processing intervals"
 );

@@ -72,12 +72,11 @@ export async function simulatePosition(position) {
   console.log("Calculating fees");
 
   const feeBlocks = await processIntervals(
-    (liq, vol) => {
-      return estimateFee(deltaL, liq, vol, pool.feeTier);
+    (liq, vol, feeTier) => {
+      return estimateFee(deltaL, liq, vol, feeTier);
     },
-    pool.id,
-    position.openTime,
-    position.closeTime,
+    pool,
+    position,
     ...mm(
       encodePriceDec(p(position.priceLow), pool),
       encodePriceDec(p(position.priceHigh), pool)
