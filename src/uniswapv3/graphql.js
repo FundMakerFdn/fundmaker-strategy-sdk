@@ -69,3 +69,27 @@ export const poolLiquidityGraphQL = (
       }
     }
   `;
+
+export const findPoolGraphQL = (token0, token1, feeTier) => `
+  query {
+    pools(
+      orderBy: feeTier,
+      where: {
+        token0_: { symbol: "${token0}" },
+        token1_: { symbol: "${token1}" },
+        feeTier: "${feeTier}"
+      }
+    ) {
+      id
+      token0 {
+        symbol
+        id
+      }
+      token1 {
+        symbol
+        id
+      }
+      feeTier
+    }
+  }
+`;

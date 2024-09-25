@@ -16,7 +16,7 @@ export const pools = sqliteTable("pools", {
   token1Symbol: text("token1Symbol").notNull(),
   token0Decimals: integer("token0Decimals").notNull(),
   token1Decimals: integer("token1Decimals").notNull(),
-  feeTier: text("feeTier").notNull(),
+  feeTier: text("feeTier"),
 });
 
 // Define trades table
@@ -32,7 +32,6 @@ export const trades = sqliteTable("trades", {
   tick: text("tick").notNull(),
 });
 
-// Define liquidity table with composite unique constraint on pool_id and timestamp
 export const liquidity = sqliteTable(
   "liquidity",
   {
@@ -47,10 +46,29 @@ export const liquidity = sqliteTable(
   },
   (table) => {
     return {
-      uniquePoolIdTimestamp: uniqueIndex("unique_pool_id_timestamp").on(
-        table.pool_id,
-        table.timestamp
-      ),
+      liquidityUniquePoolIdTimestamp: uniqueIndex(
+        "liquidity_unique_pool_id_timestamp"
+      ).on(table.pool_id, table.timestamp),
+    };
+  }
+);
+export const fee_tiers = sqliteTable(
+  "fee_tiers",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pool_id: integer("pool_id")
+      .references(() => pools.id)
+      .notNull(),
+    timestamp: integer("timestamp").notNull(),
+    feeTier: integer("feeTier").notNull(),
+
+    // Add composite unique constraint on (pool_id, timestamp)
+  },
+  (table) => {
+    return {
+      feeTiersUniquePoolIdTimestamp: uniqueIndex(
+        "fee_tiers_unique_pool_id_timestamp"
+      ).on(table.pool_id, table.timestamp),
     };
   }
 );

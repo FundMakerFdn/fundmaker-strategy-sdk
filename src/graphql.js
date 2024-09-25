@@ -132,4 +132,30 @@ export async function queryPoolLiquidity(
   }
 }
 
+export async function queryPoolAddress(poolType, ...args) {
+  try {
+    const query = q[poolType].findPoolGraphQL(...args);
+    const response = await axios.post(getSubgraphURL(poolType), {
+      query,
+    });
+    if (response?.data?.data?.pools) {
+      const pools = response?.data?.data?.pools;
+      if (pools.length === 0) return null;
+      else return pools[0].id;
+    } else {
+      console.error(
+        "Unexpected response structure for pool metadata:",
+        response.data
+      );
+      return null;
+    }
+  } catch (error) {
+    console.error("Error fetching hourly liquidity data:", error.message);
+    if (error.response) {
+      console.error("Error response:", error.response.data);
+    }
+    return [];
+  }
+}
+
 export default q;
