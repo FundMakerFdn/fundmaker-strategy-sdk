@@ -6,6 +6,7 @@
   "scripts": {
     "start": "node src/index.js",
     "simulate": "node src/simulate.js",
+    "print-pools": "node tools/print-pools.js",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate"
   },
@@ -14,9 +15,11 @@
   "license": "MIT",
   "description": "",
   "dependencies": {
+    "@json2csv/plainjs": "^7.0.6",
     "axios": "^1.7.7",
     "better-sqlite3": "^11.3.0",
     "bignumber.js": "^9.1.2",
+    "commander": "^12.1.0",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.33.0"
