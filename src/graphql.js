@@ -6,183 +6,185 @@ import * as uniswapv3 from "./uniswapv3/graphql.js";
 import * as thena from "./thena/graphql.js";
 
 const getSubgraphURL = (type) => CONFIG.SUBGRAPH_URLS[type];
-
 const q = { uniswapv3, thena };
 
-export async function queryPoolMetadata(poolType, poolAddress) {
+// Helper function to send GraphQL queries
+async function sendGraphQLQuery(poolType, query) {
   try {
-    const query = q[poolType].poolMetadataGraphQL(poolAddress);
-    const response = await axios.post(getSubgraphURL(poolType), {
-      query,
-    });
-    if (response.data && response.data.data && response.data.data.pool) {
-      return response.data.data.pool;
-    } else {
-      console.error(
-        "Unexpected response structure for pool metadata:",
-        response.data
-      );
-      return null;
-    }
+    const response = await axios.post(getSubgraphURL(poolType), { query });
+    return response?.data?.data || null;
   } catch (error) {
-    console.error("Error fetching pool metadata:", error.message);
+    console.error(`Error fetching data for ${poolType}:`, error.message);
+    if (error.response) {
+      console.error("Error response:", error.response.data);
+    }
     return null;
   }
 }
 
-// Function to get historical pool trades
-export async function queryPoolTrades(
+// Helper function for handling paginated data fetching
+async function fetchPaginatedData(
+  fetchFn,
   poolType,
   poolAddress,
   startTimestamp,
   endTimestamp,
   skip = 0,
-  allTrades = []
+  accumulatedData = []
 ) {
-  try {
+  const newData = await fetchFn(
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp,
+    skip
+  );
+  if (!newData) return accumulatedData;
+
+  const allData = accumulatedData.concat(newData);
+
+  if (newData.length === CONFIG.BATCH_SIZE) {
+    await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
+    return fetchPaginatedData(
+      fetchFn,
+      poolType,
+      poolAddress,
+      startTimestamp,
+      endTimestamp,
+      skip + CONFIG.BATCH_SIZE,
+      allData
+    );
+  }
+  return allData;
+}
+
+// Function to get pool metadata
+export async function queryPoolMetadata(poolType, poolAddress) {
+  const query = q[poolType].poolMetadataGraphQL(poolAddress);
+  const data = await sendGraphQLQuery(poolType, query);
+  if (data?.pool) return data.pool;
+  else {
+    console.error("Unexpected response structure for pool metadata:", data);
+    return null;
+  }
+}
+
+export async function queryPoolAddress(
+  poolType,
+  symbol0,
+  symbol1,
+  feeTier = null
+) {
+  const query = q[poolType].poolAddressGraphQL(symbol0, symbol1, feeTier);
+  const data = await sendGraphQLQuery(poolType, query);
+  if (data?.pools) return data.pools;
+  else {
+    console.error(
+      "Unexpected response structure for pool address query:",
+      data
+    );
+    return null;
+  }
+}
+
+// Function to fetch pool trades (with pagination)
+export async function queryPoolTrades(
+  poolType,
+  poolAddress,
+  startTimestamp,
+  endTimestamp
+) {
+  const fetchTrades = async (
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp,
+    skip
+  ) => {
     const query = q[poolType].poolTradesGraphQL(
       poolAddress,
       startTimestamp,
       endTimestamp,
       skip
     );
-    const response = await axios.post(getSubgraphURL(poolType), {
-      query,
-    });
+    const data = await sendGraphQLQuery(poolType, query);
+    return data?.swaps || [];
+  };
 
-    if (response?.data?.data?.swaps) {
-      const trades = response.data.data.swaps;
-
-      // Concatenate the new trades with the already fetched ones
-      allTrades = allTrades.concat(trades);
-
-      // If the number of fetched trades equals the batch size, there may be more trades to fetch.
-      if (trades.length === CONFIG.BATCH_SIZE) {
-        await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
-        // Fetch the next batch of trades
-        return queryPoolTrades(
-          poolType,
-          poolAddress,
-          startTimestamp,
-          endTimestamp,
-          skip + CONFIG.BATCH_SIZE,
-          allTrades
-        );
-      }
-
-      return allTrades; // Return all fetched trades once there are no more to fetch
-    } else {
-      console.error("Unexpected response structure:", response.data);
-      return allTrades; // Return whatever has been fetched so far
-    }
-  } catch (error) {
-    console.error("Error fetching trades:", error.message);
-    if (error.response) {
-      console.error("Error response:", error.response.data);
-    }
-    return allTrades; // Return partial data on error
-  }
+  return fetchPaginatedData(
+    fetchTrades,
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp
+  );
 }
 
+// Function to fetch pool liquidity (with pagination)
 export async function queryPoolLiquidity(
   poolType,
   poolAddress,
   startTimestamp,
-  endTimestamp,
-  skip = 0,
-  liquidityData = []
+  endTimestamp
 ) {
-  try {
+  const fetchLiquidity = async (
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp,
+    skip
+  ) => {
     const query = q[poolType].poolLiquidityGraphQL(
       poolAddress,
       startTimestamp,
       endTimestamp,
       skip
     );
-    const response = await axios.post(getSubgraphURL(poolType), {
-      query,
-    });
-    if (response?.data?.data?.poolHourDatas) {
-      const newData = response.data.data.poolHourDatas;
-      const allData = liquidityData.concat(newData);
-      if (liquidityData.length === CONFIG.BATCH_SIZE) {
-        console.log(`Fetched ${CONFIG.BATCH_SIZE} datapoints.`);
-        await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
-        return queryPoolLiquidity(
-          poolType,
-          poolAddress,
-          startTimestamp,
-          endTimestamp,
-          skip + CONFIG.BATCH_SIZE,
-          newData
-        );
-      }
-      return allData;
-    } else {
-      console.error(
-        "Unexpected response structure for hourly liquidity data:",
-        response.data
-      );
-      return [];
-    }
-  } catch (error) {
-    console.error("Error fetching hourly liquidity data:", error.message);
-    if (error.response) {
-      console.error("Error response:", error.response.data);
-    }
-    return [];
-  }
+    const data = await sendGraphQLQuery(poolType, query);
+    return data?.poolHourDatas || [];
+  };
+
+  return fetchPaginatedData(
+    fetchLiquidity,
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp
+  );
 }
 
+// Function to fetch pool fee tiers (with pagination)
 export async function queryPoolFeeTiers(
   poolType,
   poolAddress,
   startTimestamp,
-  endTimestamp,
-  skip = 0,
-  feeTierData = []
+  endTimestamp
 ) {
-  try {
+  const fetchFeeTiers = async (
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp,
+    skip
+  ) => {
     const query = q[poolType].poolFeeTiersGraphQL(
       poolAddress,
       startTimestamp,
       endTimestamp,
       skip
     );
-    const response = await axios.post(getSubgraphURL(poolType), {
-      query,
-    });
-    if (response?.data?.data?.feeHourDatas) {
-      const newData = response.data.data.feeHourDatas;
-      const allData = feeTierData.concat(newData);
-      if (feeTierData.length === CONFIG.BATCH_SIZE) {
-        console.log(`Fetched ${CONFIG.BATCH_SIZE} datapoints.`);
-        await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
-        return queryPoolFeeTiers(
-          poolType,
-          poolAddress,
-          startTimestamp,
-          endTimestamp,
-          skip + CONFIG.BATCH_SIZE,
-          newData
-        );
-      }
-      return allData.map((datapoint) => ({
-        ...datapoint,
-        feeTier: (Number(datapoint.minFee) + Number(datapoint.maxFee)) / 2,
-      }));
-    } else {
-      console.error(
-        "Unexpected response structure for hourly feeTier data:",
-        response.data
-      );
-      return [];
-    }
-  } catch (error) {
-    console.error("Error fetching hourly feeTier data:", error.message);
-    if (error.response) {
-      console.error("Error response:", error.response.data);
-    }
-    return [];
-  }
+    const data = await sendGraphQLQuery(poolType, query);
+    return (data?.feeHourDatas || []).map((datapoint) => ({
+      ...datapoint,
+      feeTier: (Number(datapoint.minFee) + Number(datapoint.maxFee)) / 2,
+    }));
+  };
+
+  return fetchPaginatedData(
+    fetchFeeTiers,
+    poolType,
+    poolAddress,
+    startTimestamp,
+    endTimestamp
+  );
 }

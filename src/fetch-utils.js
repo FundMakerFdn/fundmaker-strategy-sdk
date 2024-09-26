@@ -20,7 +20,9 @@ export async function savePoolMetadata(poolType, pool) {
         token1Decimals: pool.token1.decimals,
         type: poolType,
         address: pool.id,
-        feeTier: pool.feeTier, // Saving the feeTier in the pool table
+        feeTier: CONFIG.DYNAMIC_FEE_POOLS.includes(poolType)
+          ? null
+          : pool.feeTier,
       })
       .onConflictDoNothing()
       .returning();

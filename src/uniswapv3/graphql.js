@@ -16,6 +16,23 @@ export const poolMetadataGraphQL = (poolAddress) => `
       }
     }
   `;
+export const poolAddressGraphQL = (symbol0, symbol1, feeTier) => `
+    query {
+      pools(
+        where: {
+          token0_: {symbol: "${symbol0}"}
+          token1_: {symbol: "${symbol1}"}
+          ${feeTier ? "feeTier: " + feeTier : ""}
+        }
+        orderBy: totalValueLockedUSD
+      ) {
+        id
+        totalValueLockedUSD
+        volumeUSD
+        feeTier
+      }
+    }
+  `;
 export const poolTradesGraphQL = (
   poolAddress,
   startTimestamp,
