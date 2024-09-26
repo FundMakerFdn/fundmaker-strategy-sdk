@@ -38,17 +38,17 @@ _Alias for `node src/pool-finder.js`_
 
 Find pool contract address by pair token symbols' names.
 ```
-Usage: yarn pool-finder [options] <token0> <token1> [feeTier]
+Usage: pool-finder [options] <token0> <token1> [feeTier]
 
-Find the pool address by token symbols
+Find the pool address by token symbols, ranked by TVL.
 
 Arguments:
-  token0                 token 0 symbol
-  token1                 token 1 symbol
+  token0                 token 0 symbol, _ means any
+  token1                 token 1 symbol, _ means any
   feeTier                pool fee tier
 
 Options:
-  -t, --type <poolType>  pool type - <uniswapv3 | thena> (default: "uniswapv3")
+  -t, --type <poolType>  pool type - uniswapv3 | thena (default: "uniswapv3")
   -h, --help             display help for command
 ```
 Example: `yarn pool-finder USDC WETH 500`. Usage:
