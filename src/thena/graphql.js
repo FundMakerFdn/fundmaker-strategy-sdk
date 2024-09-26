@@ -20,15 +20,18 @@ export const poolAddressGraphQL = (symbol0, symbol1, _) => `
     query {
       pools(
         where: {
-          token0_: {symbol: "${symbol0}"}
-          token1_: {symbol: "${symbol1}"}
+          ${symbol0 != "_" ? `token0_: {symbol: "${symbol0}"}` : ""}
+          ${symbol1 != "_" ? `token1_: {symbol: "${symbol1}"}` : ""}
         }
         orderBy: totalValueLockedUSD
+        orderDirection: desc
       ) {
         id
         totalValueLockedUSD
         volumeUSD
         feeTier:fee
+        token0 {symbol}
+        token1 {symbol}
       }
     }
   `;

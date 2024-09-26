@@ -24,8 +24,8 @@ async function findPool(token0, token1, feeTier) {
     return;
   }
   console.log("Search results:");
-  for (const pool of pools) {
-    console.log("\nCA:", pool.id);
+  for (const pool of pools.reverse()) {
+    console.log("\nPair", pool.token0.symbol, pool.token1.symbol, pool.id);
     console.log(
       "Total Value Locked (USD):",
       formatUSD(pool.totalValueLockedUSD)
@@ -40,8 +40,8 @@ async function findPool(token0, token1, feeTier) {
 program
   .description("Find the pool address by token symbols")
   .option("-t, --type <poolType>", "pool type - uniswapv3 | thena", "uniswapv3")
-  .argument("<token0>", "token 0 symbol")
-  .argument("<token1>", "token 1 symbol")
+  .argument("<token0>", "token 0 symbol, _ means any")
+  .argument("<token1>", "token 1 symbol, _ means any")
   .argument("[feeTier]", "pool fee tier")
   .action(findPool);
 
