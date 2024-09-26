@@ -31,3 +31,24 @@ Fetch the data in the period specified in the configuration file. May take some 
 _Alias for `node src/simulate.js`_
 
 Simulate the position & fees for the period specified in the configuration file.
+
+### `yarn pool-finder`
+
+_Alias for `node src/pool-finder.js`_
+
+Find pool contract address by pair token symbols' names.
+```
+Usage: yarn pool-finder [options] <token0> <token1> [feeTier]
+
+Find the pool address by token symbols
+
+Arguments:
+  token0                 token 0 symbol
+  token1                 token 1 symbol
+  feeTier                pool fee tier
+
+Options:
+  -t, --type <poolType>  pool type - <uniswapv3 | thena> (default: "uniswapv3")
+  -h, --help             display help for command
+```
+Example: `yarn pool-finder USDC WETH 500`. Usage:
