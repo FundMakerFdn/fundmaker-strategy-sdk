@@ -7,7 +7,6 @@ import {
   check,
 } from "drizzle-orm/sqlite-core";
 
-// Define pools table
 export const pools = sqliteTable("pools", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   type: text("type").notNull().default("uniswapv3"), // uniswapv3 | thena
@@ -19,7 +18,6 @@ export const pools = sqliteTable("pools", {
   feeTier: text("feeTier"),
 });
 
-// Define trades table
 export const trades = sqliteTable("trades", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   txid: text("txid").notNull().unique(),
