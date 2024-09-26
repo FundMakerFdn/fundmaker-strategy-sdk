@@ -15,6 +15,14 @@ async function findPool(token0, token1, feeTier) {
 
   console.log("Searching...");
   const pools = await queryPoolAddress(poolType, symbol0, symbol1, feeTier);
+
+  if (pools.length === 0) {
+    console.log("No pools found. Please check the following:");
+    console.log("- Should one of the token be wrapped (e.g. WETH)?");
+    console.log("- Is pool type correct (see pool-finder -h for help)");
+    console.log(`- Try searching the reverse pair - ${symbol1} ${symbol0}?`);
+    return;
+  }
   console.log("Search results:");
   for (const pool of pools) {
     console.log("\nCA:", pool.id);
