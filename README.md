@@ -85,3 +85,21 @@ When there are multiple pools found, they are ordered by TVL (Total Value Locked
 4. Use Thena instead of the default (UniswapV3): `yarn pool-finder -t thena _ wbnb`
 
 5. List all pools ranked by TVL: `yarn pool-finder _ _`
+
+## yarn print-pools
+
+_Alias for `node tools/pools-csv.js -p"`_
+
+Print a CSV file of all pools in the database.
+
+## yarn export-pools filename.csv
+
+_Alias for `node tools/pools-csv.js -e`_
+
+Export all saved pools to a CSV file.
+
+## yarn import-pools filename.csv
+
+_Alias for `node tools/pools-csv.js -i`_
+
+Replace all saved pools with the data from `filename.csv`. Useful for deleting unneeded pools.
