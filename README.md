@@ -92,14 +92,14 @@ _Alias for `node tools/pools-csv.js -p`_
 
 Print a CSV file of all pools in the database.
 
-## yarn export-pools filename.csv
+## yarn export-pools
 
 _Alias for `node tools/pools-csv.js -e`_
 
-Export all saved pools to a CSV file.
+Export all saved pools to a CSV file. Usage: `yarn export-pools filename.csv`.
 
-## yarn import-pools filename.csv
+## yarn import-pools
 
 _Alias for `node tools/pools-csv.js -i`_
 
-Replace all saved pools with the data from `filename.csv`. Useful for deleting unneeded pools.
+Replace all saved pools with pools from the CSV file. Usage: `yarn import-pools filename.csv`.
