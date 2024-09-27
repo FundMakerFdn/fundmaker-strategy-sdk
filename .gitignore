@@ -1,5 +1,6 @@
 *.db
 drizzle/
+*.csv
 
 # Logs
 logs
