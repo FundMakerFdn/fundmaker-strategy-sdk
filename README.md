@@ -1,4 +1,6 @@
-# Getting started
+# FundMaker Strategy SDK
+
+## Getting started
 
 First, make sure you have `yarn` installed. `npm` could work too, but `yarn` is preferred for this project. Then, run the following:
 
