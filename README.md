@@ -88,7 +88,7 @@ When there are multiple pools found, they are ordered by TVL (Total Value Locked
 
 ## yarn print-pools
 
-_Alias for `node tools/pools-csv.js -p"`_
+_Alias for `node tools/pools-csv.js -p`_
 
 Print a CSV file of all pools in the database.
 
