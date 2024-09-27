@@ -17,7 +17,8 @@ async function poolsCSV(opts) {
       .on("data", (row) => csvData.push(row))
       .on("end", async () => {
         try {
-          await db.run(sql`DELETE FROM ${pools}`);
+          await db.run(sql`PRAGMA foreign_keys = OFF`);
+          await db.delete(pools);
           if (csvData.length > 0)
             await db.insert(pools).values(csvData).execute();
           console.log(`Data successfully imported from ${opts.import}`);

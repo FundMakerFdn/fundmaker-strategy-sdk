@@ -20,7 +20,7 @@ export const pools = sqliteTable("pools", {
 
 export const trades = sqliteTable("trades", {
   id: integer("id").primaryKey({ autoIncrement: true }),
-  txid: text("txid").notNull().unique(),
+  txid: text("txid").notNull(),
   timestamp: integer("timestamp").notNull(),
   pool_id: integer("pool_id").references(() => pools.id),
   amount0: text("amount0").notNull(),
