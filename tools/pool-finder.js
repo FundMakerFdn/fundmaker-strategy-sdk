@@ -31,7 +31,9 @@ async function findPool(token0, token1, feeTier) {
       formatUSD(pool.totalValueLockedUSD)
     );
     console.log(
-      `Fee tier: ${pool.feeTier} (${getFeeTierPercentage(pool.feeTier) * 100}%)`
+      `Fee tier: ${pool.feeTier} (${(
+        getFeeTierPercentage(pool.feeTier) * 100
+      ).toPrecision(6)}%)`
     );
   }
   console.log();

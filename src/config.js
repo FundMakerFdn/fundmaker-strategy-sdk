@@ -11,8 +11,8 @@ const CONFIG = {
   SHOW_SIMULATION_PROGRESS: true, // print a dot for each hour simulated
 
   SUBGRAPH_URLS: {
-    uniswapv3: process.env.UNISWAP_V3_SUBGRAPH_URL,
-    thena: process.env.THENA_SUBGRAPH_URL,
+    uniswapv3: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV`,
+    thena: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/Hnjf3ipVMCkQze3jmHp8tpSMgPmtPnXBR38iM4ix1cLt`,
   },
 
   // Pools with dynamic fee tiers
