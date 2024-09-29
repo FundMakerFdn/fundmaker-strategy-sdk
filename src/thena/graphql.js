@@ -22,11 +22,11 @@ export const poolAddressGraphQL = (symbol0, symbol1, _) => `
         where: {
           token0_: {
             ${symbol0 != "_" ? `symbol: "${symbol0}"` : ""}
-            derivedBNB_gt: 0
+            derivedBnb_gt: 0
           }
           token1_: {
             ${symbol1 != "_" ? `symbol: "${symbol1}"` : ""}
-            derivedBNB_gt: 0
+            derivedBnb_gt: 0
           }
         }
         orderBy: totalValueLockedUSD
