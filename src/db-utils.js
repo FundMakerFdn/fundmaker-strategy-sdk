@@ -13,17 +13,20 @@ export const getPoolMetadata = handle(async (poolType, poolAddress) => {
   return rows[0];
 }, "reading pool metadata");
 
-export const getPrice = handle(async (poolId, timestamp) => {
+export const getPrices = handle(async (poolId, timestamp) => {
   const rows = await db
-    .select({
-      sqrtPriceX96: trades.sqrtPriceX96,
-      timestamp: trades.timestamp,
-    })
+    .select()
     .from(trades)
     .where(eq(trades.pool_id, poolId))
     .orderBy(sql`ABS(${trades.timestamp} - ${timestamp.getTime()})`) // Assuming timestamp is a Date object
     .limit(1);
-  return rows[0].sqrtPriceX96;
+  if (rows.length === 0) {
+    throw new Error("No trades found in the database");
+  }
+  const price0 = Math.abs(Number(rows[0].amountUSD) / Number(rows[0].amount0));
+  const price1 = Math.abs(Number(rows[0].amountUSD) / Number(rows[0].amount1));
+  const sqrtPriceX96 = rows[0].sqrtPriceX96;
+  return { price0, price1, sqrtPriceX96 };
 }, "reading price from DB");
 
 export const getTableBetween = async (
@@ -176,4 +179,36 @@ export async function batchInsert(db, table, items, chunkSize = 999) {
       .values(items.slice(i, i + chunkSize))
       .onConflictDoNothing();
   }
+}
+
+export async function findFirstMissingHourlyInterval(
+  poolId,
+  startDate,
+  endDate
+) {
+  const startTimestamp = Math.floor(new Date(startDate).getTime());
+  const endTimestamp = Math.floor(new Date(endDate).getTime());
+  const hourInMilliseconds = 3600000;
+
+  const hourlyIntervals = sql`
+    WITH RECURSIVE hourly_intervals AS (
+      SELECT ${startTimestamp} AS interval_start
+      UNION ALL
+      SELECT interval_start + ${hourInMilliseconds}
+      FROM hourly_intervals
+      WHERE interval_start + ${hourInMilliseconds} <= ${endTimestamp}
+    )
+    SELECT interval_start
+    FROM hourly_intervals
+    LEFT JOIN ${trades} 
+      ON ${trades.timestamp} >= interval_start
+      AND ${trades.timestamp} < interval_start + ${hourInMilliseconds}
+      AND ${trades.pool_id} = ${poolId}
+    WHERE ${trades.id} IS NULL
+    LIMIT 1;
+  `;
+
+  const result = await db.all(hourlyIntervals);
+
+  return result.length > 0 ? result[0].interval_start : null;
 }

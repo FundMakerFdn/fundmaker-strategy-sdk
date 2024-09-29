@@ -10,6 +10,7 @@
     "export-pools": "node tools/pools-csv.js -e",
     "import-pools": "node tools/pools-csv.js -i",
     "pool-finder": "node tools/pool-finder.js",
+    "strategy": "node tools/make-trades.js",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate"
   },

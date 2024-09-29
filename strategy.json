@@ -1,0 +1,10 @@
+{
+  "hoursCheckOpen": [11, 21],
+  "volatilityThreshold": 0.5,
+  "hoursCheckClose": [10],
+  "positionOpenDays": 3,
+  "priceRange": {
+    "uptickPercent": 2,
+    "downtickPercent": 3
+  }
+}
