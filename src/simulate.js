@@ -40,9 +40,15 @@ function printPosition(pool, [amount0, amount1]) {
 
 export async function simulatePosition(position) {
   const p = position.invPrices ? (p) => 1 / p : (p) => p;
-  const pool = await getPoolMetadata(position.poolType, position.poolAddress);
-  const open = await getDecodedPrices(pool, position.openTime);
-  const close = await getDecodedPrices(pool, position.closeTime);
+  let pool, open, close;
+  try {
+    pool = await getPoolMetadata(position.poolType, position.poolAddress);
+    open = await getDecodedPrices(pool, position.openTime);
+    close = await getDecodedPrices(pool, position.closeTime);
+  } catch (err) {
+    console.error("Failed to read local DB, please fetch the data");
+    return;
+  }
 
   const priceHigh = open.price + (open.price * position.uptickPercent) / 100;
   const priceLow = open.price - (open.price * position.downtickPercent) / 100;

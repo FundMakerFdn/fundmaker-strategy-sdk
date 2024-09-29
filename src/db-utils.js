@@ -21,7 +21,7 @@ export const getPrices = handle(async (poolId, timestamp) => {
     .orderBy(sql`ABS(${trades.timestamp} - ${timestamp.getTime()})`) // Assuming timestamp is a Date object
     .limit(1);
   if (rows.length === 0) {
-    throw new Error("No trades found in the database");
+    throw new Error("Trades query returned no results - try fetching data");
   }
   const price0 = Math.abs(Number(rows[0].amountUSD) / Number(rows[0].amount0));
   const price1 = Math.abs(Number(rows[0].amountUSD) / Number(rows[0].amount1));

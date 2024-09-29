@@ -4,7 +4,7 @@ config();
 const CONFIG = {
   POOL_ADDRESS: "0xcbcdf9626bc03e24f779434178a73a0b4bad62ed",
   POOL_TYPE: "uniswapv3", // uniswapv3, thena
-  START_DATE: new Date("2024-09-14T17:15:00.000Z"), // data fetch start date
+  START_DATE: new Date("2024-07-14T17:15:00.000Z"), // data fetch start date
   END_DATE: new Date("2024-09-15T11:12:00.000Z"), // data fetch end date
   BATCH_SIZE: 1000,
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
