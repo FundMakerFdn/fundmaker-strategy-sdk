@@ -189,7 +189,11 @@ export const getTokensAmountFromDepositAmountUSD = (
   if (deltaX * priceUSDX > depositAmountUSD)
     deltaX = depositAmountUSD / priceUSDX;
 
-  return { amount0: deltaX, amount1: deltaY, liquidityDelta: deltaL };
+  return {
+    amount0: deltaX,
+    amount1: deltaY,
+    liquidityDelta: deltaL,
+  };
 };
 
 // for calculation detail, please visit README.md (Section: Calculation Breakdown, No. 2)
@@ -295,12 +299,47 @@ const mulDiv = (a, b, multiplier) => {
   return a.multipliedBy(b).div(multiplier);
 };
 
-export const calculateImpermanentLoss = (P_current, P_initial) => {
-  const sqrtP_current = Math.sqrt(P_current);
-  const sqrtP_initial = Math.sqrt(P_initial);
+export const calculateIL = (
+  futurePrice,
+  priceRangeValue,
+  liquidityDelta,
+  amount0,
+  amount1
+) => {
+  debugger;
+  let Pl = priceRangeValue[0];
+  let Pu = priceRangeValue[1];
 
-  const impermanentLoss =
-    1 - (2 * sqrtP_current) / (sqrtP_current + sqrtP_initial);
+  // Strategy A: based on current amount and future price
+  const valueUSDToken0A = amount0 * futurePrice[0];
+  const valueUSDToken1A = amount1 * futurePrice[1];
+  const totalValueA = valueUSDToken0A + valueUSDToken1A;
 
-  return impermanentLoss;
+  // Strategy B: calculating token amounts for future prices
+  let futureP = futurePrice[1] / futurePrice[0];
+  if (futureP < Pl) futureP = Pl;
+  if (futureP > Pu) futureP = Pu;
+
+  let deltaY = liquidityDelta * (Math.sqrt(futureP) - Math.sqrt(Pl));
+  if (deltaY * futurePrice[0] < 0) deltaY = 0;
+  if (futureP < Pl) deltaY = 0;
+
+  let deltaX = liquidityDelta * (1 / Math.sqrt(futureP) - 1 / Math.sqrt(Pu));
+  if (deltaX * futurePrice[1] < 0) deltaX = 0;
+
+  // Strategy B values
+  const valueUSDToken0B = deltaY * futurePrice[0];
+  const valueUSDToken1B = deltaX * futurePrice[1];
+
+  // Total Value B
+  const totalValueB = valueUSDToken0B + valueUSDToken1B;
+
+  // Calculate Impermanent Loss (IL)
+  const IL = Math.abs(totalValueA - totalValueB);
+  const ILPercentage = Math.abs((100 * IL) / totalValueA);
+
+  return {
+    totalValueB,
+    ILPercentage,
+  };
 };

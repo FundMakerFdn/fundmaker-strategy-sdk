@@ -1,6 +1,6 @@
 import db from "./database.js";
 import { pools, trades, liquidity, fee_tiers } from "./schema.js";
-import { sql, and, eq, between } from "drizzle-orm";
+import { sql, and, eq, between, gte } from "drizzle-orm";
 import { handle } from "./misc-utils.js";
 import CONFIG from "./config.js";
 
@@ -17,7 +17,7 @@ export const getPrices = handle(async (poolId, timestamp) => {
   const rows = await db
     .select()
     .from(trades)
-    .where(eq(trades.pool_id, poolId))
+    .where(and(eq(trades.pool_id, poolId), gte(trades.amountUSD, 10)))
     .orderBy(sql`ABS(${trades.timestamp} - ${timestamp.getTime()})`) // Assuming timestamp is a Date object
     .limit(1);
   if (rows.length === 0) {
@@ -211,4 +211,43 @@ export async function findFirstMissingHourlyInterval(
   const result = await db.all(hourlyIntervals);
 
   return result.length > 0 ? result[0].interval_start : null;
+}
+
+export function getAllTrades(pool_id, startDate, endDate) {
+  // Convert JavaScript Date objects to Unix timestamps
+  const startTimestamp = startDate.getTime();
+  const endTimestamp = endDate.getTime();
+
+  // Raw SQL query with dynamic filtering
+  const query = sql`
+    SELECT 
+        t.*, 
+        l.liquidity AS current_liquidity, 
+        f.feeTier AS current_feeTier
+    FROM 
+        ${trades} t
+    LEFT JOIN 
+        ${liquidity} l ON t.pool_id = l.pool_id 
+        AND l.timestamp = (
+            SELECT MAX(l2.timestamp)
+            FROM ${liquidity} l2
+            WHERE l2.pool_id = t.pool_id 
+            AND l2.timestamp <= t.timestamp
+        )
+    LEFT JOIN 
+        ${fee_tiers} f ON t.pool_id = f.pool_id 
+        AND f.timestamp = (
+            SELECT MAX(f2.timestamp)
+            FROM ${fee_tiers} f2
+            WHERE f2.pool_id = t.pool_id 
+            AND f2.timestamp <= t.timestamp
+        )
+    WHERE 
+        t.pool_id = ${pool_id}
+        AND t.timestamp BETWEEN ${startTimestamp} AND ${endTimestamp}
+  `;
+
+  // Execute the query and return the results
+  const res = db.all(query);
+  return res;
 }

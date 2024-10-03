@@ -2,29 +2,25 @@ import CONFIG from "./config.js";
 import {
   decodeSqrtPriceX96,
   expandDecimals,
-  calculatePositionFees,
   getTokensAmountFromDepositAmountUSD,
   getLiquidityDelta,
   estimateFee,
   encodeSqrtPriceX96,
+  calculateIL,
 } from "./pool-math.js";
-import {
-  getPrices,
-  getPoolMetadata,
-  sumTradeVolume,
-  processIntervals,
-} from "./db-utils.js";
+import { getPrices, getPoolMetadata, getAllTrades } from "./db-utils.js";
 import bn from "bignumber.js";
 import { mm } from "./misc-utils.js";
 
 async function getDecodedPrices(pool, timestamp) {
   const prices = await getPrices(pool.id, timestamp);
+  const price = +expandDecimals(
+    decodeSqrtPriceX96(prices.sqrtPriceX96),
+    pool.token0Decimals - pool.token1Decimals
+  );
   return {
     ...prices,
-    price: +expandDecimals(
-      decodeSqrtPriceX96(prices.sqrtPriceX96),
-      pool.token0Decimals - pool.token1Decimals
-    ),
+    price,
   };
 }
 
@@ -41,12 +37,14 @@ function printPosition(pool, [amount0, amount1]) {
 export async function simulatePosition(position) {
   const p = position.invPrices ? (p) => 1 / p : (p) => p;
   let pool, open, close;
+
   try {
     pool = await getPoolMetadata(position.poolType, position.poolAddress);
     open = await getDecodedPrices(pool, position.openTime);
     close = await getDecodedPrices(pool, position.closeTime);
   } catch (err) {
     console.error("Failed to read local DB, please fetch the data");
+    console.log(err);
     return;
   }
 
@@ -59,7 +57,7 @@ export async function simulatePosition(position) {
   console.log("Token prices at open:", open.price0, open.price1);
 
   // Calculate initial position
-  const current = getTokensAmountFromDepositAmountUSD(
+  let pos = getTokensAmountFromDepositAmountUSD(
     open.price,
     priceLow,
     priceHigh,
@@ -67,81 +65,97 @@ export async function simulatePosition(position) {
     open.price1,
     position.amountUSD
   );
-  printPosition(pool, [current.amount0, current.amount1]);
-
-  // Calculate liquidity delta
-  const deltaL = getLiquidityDelta(
-    open.price,
-    priceLow,
-    priceHigh,
-    current.amount0,
-    current.amount1,
-    pool.token0Decimals,
-    pool.token1Decimals
-  );
+  printPosition(pool, [pos.amount0, pos.amount1]);
 
   console.log("Calculating fees");
-  const feeBlocks = await processIntervals(
-    (liq, vol, feeTier) => {
-      return estimateFee(deltaL, liq, vol, feeTier);
-    },
-    pool,
-    position,
-    ...mm(encodePriceDec(priceLow, pool), encodePriceDec(priceHigh, pool))
+
+  // Fetch all trades within the interval
+  const trades = await getAllTrades(
+    pool.id,
+    position.openTime,
+    position.closeTime
   );
+  console.log(`Simulating ${trades.length} trades...`);
+
+  let feesCollected = 0;
+  let future = { ...pos };
+
+  // Track whether the price is within the range
+  let inRange = true;
+
+  for (const trade of trades) {
+    debugger;
+    const volumeUSD = new bn(trade.amountUSD);
+    if (volumeUSD.lt(1)) continue;
+
+    // Calculate the pos trade price
+    const tradePrice = +expandDecimals(
+      decodeSqrtPriceX96(trade.sqrtPriceX96),
+      pool.token0Decimals - pool.token1Decimals
+    );
+
+    // Check if the price is within the defined range
+    if (tradePrice < priceLow || tradePrice > priceHigh) {
+      if (inRange) {
+        // If the price leaves the range, freeze the token amounts
+        if (CONFIG.VERBOSE)
+          console.log(
+            "OUT OF RANGE:",
+            tradePrice,
+            future.amount0,
+            future.amount1
+          );
+        inRange = false;
+      }
+    } else {
+      if (!inRange) {
+        if (CONFIG.VERBOSE)
+          console.log("IN RANGE:", tradePrice, future.amount0, future.amount1);
+        inRange = true;
+      }
+
+      const deltaL = getLiquidityDelta(
+        tradePrice,
+        priceLow,
+        priceHigh,
+        pos.amount0,
+        pos.amount1,
+        pool.token0Decimals,
+        pool.token1Decimals
+      );
+
+      const fee = estimateFee(
+        deltaL,
+        trade.current_liquidity,
+        volumeUSD,
+        trade.current_feeTier || pool.feeTier
+      );
+
+      if (isNaN(fee)) continue;
+
+      feesCollected += fee;
+    }
+  }
+
   if (CONFIG.SHOW_SIMULATION_PROGRESS) console.log("");
-  const feesCollected = bn.sum(...feeBlocks).toNumber();
   console.log("Fees collected by position (USD):", feesCollected);
 
   console.log("Exit price:", p(close.price));
   console.log("Token prices at close:", close.price0, close.price1);
 
-  // Calculate future position
-  const future = getTokensAmountFromDepositAmountUSD(
-    close.price,
-    priceLow,
-    priceHigh,
-    close.price0,
-    close.price1,
-    position.amountUSD + feesCollected
+  const { totalValueB: newValueUSD, ILPercentage } = calculateIL(
+    [close.price0, close.price1],
+    mm(1 / priceLow, 1 / priceHigh),
+    pos.liquidityDelta,
+    pos.amount0,
+    pos.amount1
   );
+  console.log("IL (%):", ILPercentage);
+  console.log("Position value (USD):", newValueUSD);
 
-  // Strategy A: Holding tokens
-  const valueUSDToken0A = current.amount0 * close.price0;
-  const valueUSDToken1A = current.amount1 * close.price1;
-  const totalValueA = valueUSDToken0A + valueUSDToken1A;
-  const percentageA =
-    (100 * (totalValueA - position.amountUSD)) / position.amountUSD;
-
-  // Strategy B: Providing liquidity
-  const valueUSDToken0B = future.amount0 * close.price0;
-  const valueUSDToken1B = future.amount1 * close.price1;
-  const totalValueB = valueUSDToken0B + valueUSDToken1B + feesCollected;
-  const percentageB =
-    (100 * (totalValueB - position.amountUSD)) / position.amountUSD;
-
-  // Calculate Impermanent Loss
-  const IL = Math.abs(totalValueA - (valueUSDToken0B + valueUSDToken1B));
-  const ILPercentage = (100 * IL) / totalValueA;
-
-  // Calculate PnL
-  const PnLBA = totalValueB - totalValueA;
-  const PnL = totalValueB - position.amountUSD;
-
-  if (CONFIG.VERBOSE) {
-    console.log("Strategy A (Holding tokens):");
-    console.log(`  Total value: ${totalValueA}`);
-    console.log(`  Percentage change: ${percentageA}%`);
-
-    console.log("Strategy B (Providing liquidity):");
-    console.log(`  Total value: ${totalValueB}`);
-    console.log(`  Percentage change: ${percentageB}%`);
-
-    console.log(`Impermanent Loss: ${IL} (${ILPercentage}%)`);
-  }
-  printPosition(pool, [future.amount0, future.amount1]);
-  console.log("Total PnL (USD):", PnL);
-  console.log("Position value (USD):", totalValueB);
+  const totalPnL = newValueUSD - position.amountUSD;
+  console.log("Total PnL (USD):", totalPnL);
+  console.log("Total PnL (%):", (newValueUSD / position.amountUSD - 1) * 100);
 }
 
 simulatePosition(CONFIG.position);
