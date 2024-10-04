@@ -306,7 +306,6 @@ export const calculateIL = (
   amount0,
   amount1
 ) => {
-  debugger;
   let Pl = priceRangeValue[0];
   let Pu = priceRangeValue[1];
 

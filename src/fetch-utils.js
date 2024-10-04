@@ -75,15 +75,17 @@ export async function fetchPool(poolType, poolAddress) {
   return poolId;
 }
 
-export async function fetchDailyTrades(poolType, poolId, startDate, endDate) {
-  let totalCount = 0;
-
+export async function fetchDailyTrades(
+  { poolType, poolId, poolAddress },
+  startDate,
+  endDate
+) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
   const trades = await queryPoolTrades(
     poolType,
-    CONFIG.POOL_ADDRESS,
+    poolAddress,
     startTimestamp,
     endTimestamp,
     0
@@ -103,14 +105,11 @@ export async function fetchDailyTrades(poolType, poolId, startDate, endDate) {
   });
 
   await saveTradesToDatabase(formattedTrades, poolId);
-  totalCount += trades.length;
 
   console.log(
-    `Fetched ${trades.length} trades. Total since launch: ${totalCount}`
-  );
-
-  console.log(
-    `Finished fetching trades for ${startDate.toISOString()} to ${endDate.toISOString()}`
+    `Fetched ${
+      trades.length
+    } trades for ${startDate.toISOString()} to ${endDate.toISOString()}`
   );
 }
 

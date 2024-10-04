@@ -19,3 +19,6 @@ export const handle = (func, errStr) => {
     }
   };
 };
+
+export const padDateMS = (pad, date) =>
+  new Date(new Date(date).getTime() + pad);

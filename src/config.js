@@ -21,10 +21,13 @@ const CONFIG = {
   // Make sure that the swap reflects the current price
   SWAP_USD_THRESHOLD: 1,
 
-  VERBOSE: false,
+  // Fetch also one day before and after the period
+  FETCH_PAD_MS: 24 * 60 * 60000,
+
+  VERBOSE: true,
 };
 
-CONFIG.position = {
+/*CONFIG.position = {
   invPrices: true, // only visually
   amountUSD: 52,
   uptickPercent: 20, // +% of openPrice for price range
@@ -35,6 +38,6 @@ CONFIG.position = {
   closeTime: CONFIG.END_DATE,
   poolAddress: CONFIG.POOL_ADDRESS,
   poolType: CONFIG.POOL_TYPE,
-};
+};*/
 
 export default CONFIG;

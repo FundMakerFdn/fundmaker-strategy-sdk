@@ -70,11 +70,7 @@ export async function simulatePosition(position) {
   console.log("Calculating fees");
 
   // Fetch all trades within the interval
-  const trades = await getAllTrades(
-    pool.id,
-    position.openTime,
-    position.closeTime
-  );
+  const trades = getAllTrades(pool.id, position.openTime, position.closeTime);
   console.log(`Simulating ${trades.length} trades...`);
 
   let feesCollected = 0;
@@ -153,8 +149,11 @@ export async function simulatePosition(position) {
   console.log("Position value (USD):", newValueUSD);
 
   const totalPnL = newValueUSD - position.amountUSD;
+  const totalPnLPercent = (newValueUSD / position.amountUSD - 1) * 100;
   console.log("Total PnL (USD):", totalPnL);
-  console.log("Total PnL (%):", (newValueUSD / position.amountUSD - 1) * 100);
+  console.log("Total PnL (%):", totalPnLPercent);
+
+  return totalPnLPercent;
 }
 
 simulatePosition(CONFIG.position);

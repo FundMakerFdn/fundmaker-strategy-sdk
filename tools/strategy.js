@@ -6,6 +6,8 @@ import db from "#src/database.js";
 import { pools, trades } from "#src/schema.js";
 import { sql, eq, and, between, count } from "drizzle-orm";
 import { findFirstMissingHourlyInterval } from "#src/db-utils.js";
+import { fetchData } from "#src/fetcher.js";
+import CONFIG from "#src/config.js";
 
 function parseCSV(filePath) {
   return new Promise((resolve, reject) => {
@@ -24,22 +26,29 @@ function parseCSV(filePath) {
 }
 
 async function main(opts) {
+  const strategyJSON = JSON.parse(fs.readFileSync(opts.strategy, "utf8"));
   const poolsCSV = await parseCSV(opts.input);
-  for (const row of poolsCSV) {
-    const poolId = await fetchPool(row.poolType, row.poolAddress);
-    const startDate = new Date(row.startDate);
-    const endDate = new Date(row.endDate);
-    const missingData = await findFirstMissingHourlyInterval(
-      poolId,
-      startDate,
-      endDate
-    );
-    if (missingData) {
-      console.log(
-        `Data fetching needed! Please run "yarn fetch ${opts.input}"`
+
+  for (const strategy of strategyJSON) {
+    console.log(`Executing strategy "${strategy.strategyName}"`);
+    for (const poolRow of poolsCSV) {
+      if (CONFIG.VERBOSE) console.log("Pool", poolRow.poolAddress);
+      const poolId = await fetchPool(poolRow.poolType, poolRow.poolAddress);
+      const startDate = new Date(poolRow.startDate);
+      const endDate = new Date(poolRow.endDate);
+
+      if (CONFIG.VERBOSE) console.log("Checking for data integrity...");
+      const missingData = await findFirstMissingHourlyInterval(
+        poolId,
+        startDate,
+        endDate
       );
-      return;
+      if (missingData) {
+        console.log("Fetching the data...");
+        await fetchData({ ...poolRow, poolId, startDate, endDate });
+      }
     }
+    // strategy
   }
 }
 

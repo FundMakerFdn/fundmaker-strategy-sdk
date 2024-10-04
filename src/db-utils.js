@@ -192,23 +192,24 @@ export async function findFirstMissingHourlyInterval(
   startDate,
   endDate
 ) {
+  // Find if there is an interval of length checkIntMs with 0 trades
   const startTimestamp = Math.floor(new Date(startDate).getTime());
   const endTimestamp = Math.floor(new Date(endDate).getTime());
-  const hourInMilliseconds = 3600000;
+  const checkIntMs = 3600000; // 1 hour
 
   const hourlyIntervals = sql`
     WITH RECURSIVE hourly_intervals AS (
       SELECT ${startTimestamp} AS interval_start
       UNION ALL
-      SELECT interval_start + ${hourInMilliseconds}
+      SELECT interval_start + ${checkIntMs}
       FROM hourly_intervals
-      WHERE interval_start + ${hourInMilliseconds} <= ${endTimestamp}
+      WHERE interval_start + ${checkIntMs} <= ${endTimestamp}
     )
     SELECT interval_start
     FROM hourly_intervals
     LEFT JOIN ${trades} 
       ON ${trades.timestamp} >= interval_start
-      AND ${trades.timestamp} < interval_start + ${hourInMilliseconds}
+      AND ${trades.timestamp} < interval_start + ${checkIntMs}
       AND ${trades.pool_id} = ${poolId}
     WHERE ${trades.id} IS NULL
     LIMIT 1;
