@@ -18,6 +18,9 @@ const CONFIG = {
   // Pools with dynamic fee tiers
   DYNAMIC_FEE_POOLS: ["thena"],
 
+  // Make sure that the swap reflects the current price
+  SWAP_USD_THRESHOLD: 1,
+
   VERBOSE: false,
 };
 

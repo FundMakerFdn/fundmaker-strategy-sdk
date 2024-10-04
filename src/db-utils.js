@@ -18,7 +18,12 @@ export const getPrices = handle(async (poolId, timestamp) => {
   const rows = await db
     .select()
     .from(trades)
-    .where(and(eq(trades.pool_id, poolId), gte(trades.amountUSD, 10)))
+    .where(
+      and(
+        eq(trades.pool_id, poolId),
+        gte(trades.amountUSD, CONFIG.SWAP_USD_THRESHOLD)
+      )
+    )
     .orderBy(sql`ABS(${trades.timestamp} - ${timestamp.getTime()})`) // Assuming timestamp is a Date object
     .limit(1);
   if (rows.length === 0) {
