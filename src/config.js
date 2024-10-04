@@ -2,8 +2,8 @@ import { config } from "dotenv";
 config();
 
 const CONFIG = {
-  POOL_ADDRESS: "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640",
-  POOL_TYPE: "uniswapv3", // uniswapv3, thena
+  POOL_ADDRESS: "0x1123e75b71019962cd4d21b0f3018a6412edb63c",
+  POOL_TYPE: "thena", // uniswapv3, thena
   START_DATE: new Date("2024-09-14T17:12:00.000Z"), // data fetch start date
   END_DATE: new Date("2024-09-30T11:12:00.000Z"), // data fetch end date
   BATCH_SIZE: 1000,
@@ -24,8 +24,8 @@ const CONFIG = {
 CONFIG.position = {
   invPrices: true, // only visually
   amountUSD: 52,
-  uptickPercent: 1, // +% of openPrice for price range
-  downtickPercent: 1, // -% of openPrice for price range
+  uptickPercent: 20, // +% of openPrice for price range
+  downtickPercent: 20, // -% of openPrice for price range
   openPrice: null, // if null, detects from openTime
   closePrice: null, // if null, detects from closeTime
   openTime: CONFIG.START_DATE,

@@ -14,6 +14,7 @@ export const getPoolMetadata = handle(async (poolType, poolAddress) => {
 }, "reading pool metadata");
 
 export const getPrices = handle(async (poolId, timestamp) => {
+  // Get price from a swap close to timestamp
   const rows = await db
     .select()
     .from(trades)

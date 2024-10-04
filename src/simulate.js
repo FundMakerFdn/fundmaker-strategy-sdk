@@ -84,9 +84,8 @@ export async function simulatePosition(position) {
   let inRange = true;
 
   for (const trade of trades) {
-    debugger;
     const volumeUSD = new bn(trade.amountUSD);
-    if (volumeUSD.lt(1)) continue;
+    if (!trade.amount0 || !trade.amount1) continue;
 
     // Calculate the pos trade price
     const tradePrice = +expandDecimals(
