@@ -6,6 +6,7 @@ import {
 } from "./fetch-utils.js";
 import CONFIG from "./config.js";
 import { padDateMS } from "./misc-utils.js";
+import { rollingRealizedVolatility } from "./volatility.js";
 
 export async function fetchData(config) {
   // padding the start and end date to ensure the data on the "edges" is retrieved
@@ -35,6 +36,9 @@ export async function fetchData(config) {
     currentDate = nextDate;
   }
   console.log("Fetched trades.");
+
+  console.log("Calculating realized volatility...");
+  rollingRealizedVolatility(config.poolId, startDate, endDate);
 }
 
 // Start the main function

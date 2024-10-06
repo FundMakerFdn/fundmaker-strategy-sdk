@@ -295,6 +295,12 @@ export const expandDecimals = (n, exp) => {
   return new bn(n).multipliedBy(new bn(10).pow(exp));
 };
 
+export const decodePrice = (sqrtPrice, pool) =>
+  +expandDecimals(
+    decodeSqrtPriceX96(sqrtPrice),
+    pool.token0Decimals - pool.token1Decimals
+  );
+
 const mulDiv = (a, b, multiplier) => {
   return a.multipliedBy(b).div(multiplier);
 };

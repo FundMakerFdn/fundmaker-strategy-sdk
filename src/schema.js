@@ -70,3 +70,24 @@ export const fee_tiers = sqliteTable(
     };
   }
 );
+
+export const volatility = sqliteTable(
+  "volatility",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    pool_id: integer("pool_id")
+      .references(() => pools.id)
+      .notNull(),
+    timestamp: integer("timestamp").notNull(),
+    realizedVolatility: text("realizedVolatility").notNull(),
+
+    // Add composite unique constraint on (pool_id, timestamp)
+  },
+  (table) => {
+    return {
+      volatilityUniquePoolIdTimestamp: uniqueIndex(
+        "volatility_unique_pool_id_timestamp"
+      ).on(table.pool_id, table.timestamp),
+    };
+  }
+);

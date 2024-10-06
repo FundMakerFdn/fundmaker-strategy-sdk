@@ -54,7 +54,7 @@ async function main(opts) {
 
 program
   .description(
-    "Execute a strategy based on pools from the CSV file in the format of (poolType,poolAddress,startDate,endDate), and write output CSV."
+    "Execute a strategy based on pools from the CSV file in the format of (poolType,poolAddress,startDate,endDate), and write output CSV with position history."
   )
   .requiredOption("-i, --input <inputCSV>", "input CSV filename")
   .requiredOption("-s, --strategy <strategyJSON>", "strategy JSON filename")

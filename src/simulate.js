@@ -1,11 +1,9 @@
 import CONFIG from "./config.js";
 import {
-  decodeSqrtPriceX96,
-  expandDecimals,
+  decodePrice,
   getTokensAmountFromDepositAmountUSD,
   getLiquidityDelta,
   estimateFee,
-  encodeSqrtPriceX96,
   calculateIL,
 } from "./pool-math.js";
 import { getPrices, getPoolMetadata, getAllTrades } from "./db-utils.js";
@@ -14,20 +12,12 @@ import { mm } from "./misc-utils.js";
 
 async function getDecodedPrices(pool, timestamp) {
   const prices = await getPrices(pool.id, timestamp);
-  const price = +expandDecimals(
-    decodeSqrtPriceX96(prices.sqrtPriceX96),
-    pool.token0Decimals - pool.token1Decimals
-  );
+  const price = decodePrice(prices.sqrtPriceX96, pool);
   return {
     ...prices,
     price,
   };
 }
-
-const encodePriceDec = (price, pool) =>
-  encodeSqrtPriceX96(
-    expandDecimals(price, pool.token1Decimals - pool.token0Decimals)
-  );
 
 function printPosition(pool, [amount0, amount1]) {
   console.log(`Position ${pool.token0Symbol}: ${amount0}`);
@@ -84,11 +74,7 @@ export async function simulatePosition(position) {
     if (!trade.amount0 || !trade.amount1) continue;
 
     // Calculate the pos trade price
-    const tradePrice = +expandDecimals(
-      decodeSqrtPriceX96(trade.sqrtPriceX96),
-      pool.token0Decimals - pool.token1Decimals
-    );
-
+    const tradePrice = decodePrice(trade.sqrtPriceX96, pool);
     // Check if the price is within the defined range
     if (tradePrice < priceLow || tradePrice > priceHigh) {
       if (inRange) {
