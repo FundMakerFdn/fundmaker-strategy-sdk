@@ -13,9 +13,11 @@ export const poolMetadataGraphQL = (poolAddress) => `
           decimals
         }
         feeTier
+        created:createdAtTimestamp
       }
     }
   `;
+
 export const poolAddressGraphQL = (symbol0, symbol1, feeTier) => `
     query {
       pools(
@@ -42,18 +44,20 @@ export const poolAddressGraphQL = (symbol0, symbol1, feeTier) => `
       }
     }
   `;
+
 export const poolTradesGraphQL = (
   poolAddress,
   startTimestamp,
   endTimestamp,
-  skip
+  skip = 0
 ) => `
     query {
       swaps(
         where: {
-          pool: "${poolAddress}",
-          timestamp_gte: ${startTimestamp},
-          timestamp_lte: ${endTimestamp}
+          pool: "${poolAddress}"
+          ${startTimestamp ? `timestamp_gte: ${startTimestamp}` : ""}
+          ${startTimestamp && endTimestamp ? "," : ""}
+          ${endTimestamp ? `timestamp_lte: ${endTimestamp}` : ""}
         }
         orderBy: timestamp
         orderDirection: asc
@@ -70,6 +74,7 @@ export const poolTradesGraphQL = (
       }
     }
   `;
+
 export const poolLiquidityGraphQL = (
   poolAddress,
   startTimestamp,
@@ -79,9 +84,10 @@ export const poolLiquidityGraphQL = (
     query {
       poolHourDatas(
         where: {
-          pool: "${poolAddress}",
-          periodStartUnix_gte: ${startTimestamp},
-          periodStartUnix_lte: ${endTimestamp}
+          pool: "${poolAddress}"
+          ${startTimestamp ? `periodStartUnix_gte: ${startTimestamp}` : ""}
+          ${startTimestamp && endTimestamp ? "," : ""}
+          ${endTimestamp ? `periodStartUnix_lte: ${endTimestamp}` : ""}
         }
         orderBy: periodStartUnix
         orderDirection: asc

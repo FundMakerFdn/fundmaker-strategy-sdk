@@ -23,6 +23,7 @@ export async function savePoolMetadata(poolType, pool) {
         feeTier: CONFIG.DYNAMIC_FEE_POOLS.includes(poolType)
           ? null
           : pool.feeTier,
+        created: pool.created * 1000,
       })
       .onConflictDoNothing()
       .returning();

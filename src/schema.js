@@ -3,8 +3,6 @@ import {
   integer,
   text,
   uniqueIndex,
-  foreignKey,
-  check,
 } from "drizzle-orm/sqlite-core";
 
 export const pools = sqliteTable("pools", {
@@ -16,6 +14,7 @@ export const pools = sqliteTable("pools", {
   token0Decimals: integer("token0Decimals").notNull(),
   token1Decimals: integer("token1Decimals").notNull(),
   feeTier: text("feeTier"),
+  created: integer("timestamp").notNull(),
 });
 
 export const trades = sqliteTable("trades", {

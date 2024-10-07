@@ -50,9 +50,13 @@ export const poolTradesGraphQL = (
     query {
       swaps(
         where: {
-          pool: "${poolAddress}",
-          timestamp_gte: ${startTimestamp},
-          timestamp_lte: ${endTimestamp}
+          pool: "${poolAddress}"
+          ${
+            startTimestamp
+              ? `timestamp_gte: ${startTimestamp}${endTimestamp ? "," : ""}`
+              : ""
+          }
+          ${endTimestamp ? `timestamp_lte: ${endTimestamp}` : ""}
         }
         orderBy: timestamp
         orderDirection: asc
@@ -69,6 +73,7 @@ export const poolTradesGraphQL = (
       }
     }
   `;
+
 export const poolLiquidityGraphQL = (
   poolAddress,
   startTimestamp,
@@ -78,9 +83,15 @@ export const poolLiquidityGraphQL = (
     query {
       poolHourDatas(
         where: {
-          pool: "${poolAddress}",
-          periodStartUnix_gte: ${startTimestamp},
-          periodStartUnix_lte: ${endTimestamp}
+          pool: "${poolAddress}"
+          ${
+            startTimestamp
+              ? `periodStartUnix_gte: ${startTimestamp}${
+                  endTimestamp ? "," : ""
+                }`
+              : ""
+          }
+          ${endTimestamp ? `periodStartUnix_lte: ${endTimestamp}` : ""}
         }
         orderBy: periodStartUnix
         orderDirection: asc
@@ -94,6 +105,7 @@ export const poolLiquidityGraphQL = (
       }
     }
   `;
+
 export const poolFeeTiersGraphQL = (
   poolAddress,
   startTimestamp,
@@ -103,9 +115,13 @@ export const poolFeeTiersGraphQL = (
     query {
       feeHourDatas(
         where: {
-          pool: "${poolAddress}",
-          timestamp_gte: ${startTimestamp},
-          timestamp_lte: ${endTimestamp}
+          pool: "${poolAddress}"
+          ${
+            startTimestamp
+              ? `timestamp_gte: ${startTimestamp}${endTimestamp ? "," : ""}`
+              : ""
+          }
+          ${endTimestamp ? `timestamp_lte: ${endTimestamp}` : ""}
         }
         orderBy: timestamp
         orderDirection: asc

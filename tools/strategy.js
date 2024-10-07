@@ -180,23 +180,24 @@ async function main(opts) {
     for (const poolRow of poolsCSV) {
       console.log("Pool", poolRow.poolType, poolRow.poolAddress);
       const poolId = await fetchPool(poolRow.poolType, poolRow.poolAddress);
-      const startDate = new Date(poolRow.startDate);
-      const endDate = new Date(poolRow.endDate);
+      const pool = await getPoolById(poolId);
+
+      const startDate = poolRow.startDate
+        ? new Date(poolRow.startDate)
+        : new Date(pool.created);
+      const endDate = poolRow.endDate ? new Date(poolRow.endDate) : new Date();
 
       if (opts.checks) {
         console.log("Checking data integrity...");
-        const didFetch = await checkLiquidityIntegrity(
-          poolId,
-          startDate,
-          endDate
-        );
+        let didFetch;
+        if (endDate !== null) {
+          didFetch = await checkLiquidityIntegrity(poolId, startDate, endDate);
+        } else didFetch = false;
         if (!didFetch) {
           console.log("Fetching the data...");
           await fetchData({ ...poolRow, poolId, startDate, endDate });
         }
       }
-
-      const pool = await getPoolById(poolId);
 
       const positions = await executeStrategy(
         db,
