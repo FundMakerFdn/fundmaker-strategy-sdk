@@ -26,6 +26,7 @@
     "commander": "^12.1.0",
     "csv-parse": "^5.5.6",
     "csv-parser": "^3.0.0",
+    "csv-writer": "^1.6.0",
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.33.0"

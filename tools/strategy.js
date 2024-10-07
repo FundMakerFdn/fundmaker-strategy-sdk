@@ -1,15 +1,12 @@
 import fs from "fs";
 import { program } from "commander";
 import csvParser from "csv-parser";
+import { createObjectCsvWriter } from "csv-writer";
 import { simulatePosition } from "#src/simulate.js";
 import db from "#src/database.js";
-import { pools, trades, volatility } from "#src/schema.js";
-import { sql, eq, and, between, count, lte, gte } from "drizzle-orm";
-import {
-  findFirstMissingHourlyInterval,
-  getPoolMetadata,
-  getPoolById,
-} from "#src/db-utils.js";
+import { trades, volatility } from "#src/schema.js";
+import { eq, and, gte } from "drizzle-orm";
+import { findFirstMissingHourlyInterval, getPoolById } from "#src/db-utils.js";
 import { fetchData } from "#src/fetcher.js";
 import CONFIG from "#src/config.js";
 import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
@@ -146,6 +143,40 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
   return positionsSim;
 }
 
+async function writeOutputCSV(results, outputFile) {
+  const csvWriter = createObjectCsvWriter({
+    path: outputFile,
+    header: [
+      "strategyName",
+      "poolType",
+      "poolAddress",
+      "openTimestamp",
+      "closeTimestamp",
+      "openPrice",
+      "targetUptickPrice",
+      "targetDowntickPrice",
+      "pnlPercent",
+    ],
+  });
+
+  const records = results.flatMap((result) =>
+    result.positions.map((position) => ({
+      strategyName: result.strategyName,
+      poolType: result.poolType,
+      poolAddress: result.poolAddress,
+      openTimestamp: new Date(position.openTimestamp).toISOString(),
+      closeTimestamp: new Date(position.closeTimestamp).toISOString(),
+      openPrice: position.openPrice,
+      targetUptickPrice: position.targetUptickPrice,
+      targetDowntickPrice: position.targetDowntickPrice,
+      pnlPercent: position.pnlPercent,
+    }))
+  );
+
+  await csvWriter.writeRecords(records);
+  console.log(`Results written to ${outputFile}`);
+}
+
 async function main(opts) {
   const strategyJSON = JSON.parse(fs.readFileSync(opts.strategy, "utf8"));
   const poolsCSV = await parseCSV(opts.input);
@@ -187,6 +218,7 @@ async function main(opts) {
       const sharpe = avgPnL / calculateStandardDeviation(pnlArr);
       results.push({
         strategyName: strategy.strategyName,
+        poolType: poolRow.poolType,
         poolAddress: poolRow.poolAddress,
         positions: positions,
         avgPnL,
@@ -194,30 +226,18 @@ async function main(opts) {
       });
     }
   }
+  // Write results to output CSV using the new function
+  await writeOutputCSV(results, opts.output);
 
-  // Write results to output CSV
-  const csvContent = [
-    "Strategy,Pool Address,Open Timestamp,Close Timestamp,Open Price,Target Uptick Price,Target Downtick Price,PnL",
-  ];
-
+  // Log summary statistics
   results.forEach((result) => {
-    result.positions.forEach((position) => {
-      csvContent.push(
-        `${result.strategyName},${result.poolAddress},${new Date(
-          position.openTimestamp
-        ).toISOString()},${new Date(position.closeTimestamp).toISOString()},${
-          position.openPrice
-        },${position.targetUptickPrice},${position.targetDowntickPrice},${
-          position.pnlPercent
-        }`
-      );
-    });
+    console.log(
+      `Strategy: ${result.strategyName}, Pool: ${result.poolAddress}`
+    );
     console.log("Average PnL %:", result.avgPnL);
     console.log("Sharpe ratio:", result.sharpe);
+    console.log("---");
   });
-
-  fs.writeFileSync(opts.output, csvContent.join("\n"));
-  console.log(`Results written to ${opts.output}`);
 }
 
 program
