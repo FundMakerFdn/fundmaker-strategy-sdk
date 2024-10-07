@@ -20,21 +20,67 @@ SUBGRAPH_API_KEY="...your 32-symbol API key..."
 
 After, you can use the commands below.
 
-## `yarn start`
+## `yarn strategy`
 
-_Alias for `node src/index.js`_
+_Alias for `node tools/strategy.js`_
 
-Fetch the data in the period specified in the configuration file. May take some time for large periods.
+The main tool, which executes trading strategies on cryptocurrency pools based on historical data. It processes input from CSV files, applies defined strategies, and outputs the results.
 
-## `yarn simulate`
+```
+Usage: strategy [options]
 
-_Alias for `node src/simulate.js`_
+Execute a strategy based on pools from the CSV file in the format of (poolType,poolAddress,startDate,endDate), and write output CSV with position history.
 
-Simulate the position & fees for the period specified in the configuration file.
+Options:
+  -i, --input <inputCSV>         input CSV filename
+  -s, --strategy <strategyJSON>  strategy JSON filename
+  -o, --output <outputCSV>       output CSV filename
+  -n, --no-checks                disable data integrity check & autofetching
+  -h, --help                     display help for command
+```
+
+### Example
+
+Let's assume we 2 input files: `input/pools.csv`, `input/strategy.json`, which look like this:
+
+#### `input/pools.csv`
+
+```
+poolType,poolAddress,startDate,endDate
+"uniswapv3","0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640","2024-09-01","2024-09-30"
+```
+
+Notice that `startDate` defaults to the creation date of the pool, `endDate` defaults to now. You can write the data in any format supported by JavaScripts' `new Date()` constructor.
+
+#### `input/strategy.json`
+
+```
+[
+  {
+    "strategyName": "Strategy 1",
+    "hoursCheckOpen": [11, 21],
+    "volatilityThreshold": 8,
+    "hoursCheckClose": [10],
+    "positionOpenDays": 3,
+    "priceRange": {
+      "uptickPercent": 2,
+      "downtickPercent": 3
+    }
+  }
+]
+```
+
+You can have multiple strategies in the same file, each strategy will be backtested with each pool.
+
+#### Running `yarn strategy`
+
+`yarn strategy -i input/pools.csv -s input/strategy.json -o output.csv`
+
+The command above runs the backtesting system and saves the result to `output.csv`, which would contain position history, and PnL % for each position. In the end, you will see the average PnL and Sharpe ratio for each strategy.
 
 ## `yarn pool-finder`
 
-_Alias for `node src/pool-finder.js`_
+_Alias for `node tools/pool-finder.js`_
 
 Find pool contract address by pair token symbols' names.
 
