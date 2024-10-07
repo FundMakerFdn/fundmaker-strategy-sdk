@@ -26,9 +26,10 @@ export async function calcRealizedVolatility(pool_id, startDate, endDate) {
     .execute();
 
   if (tradeData.length < 2) {
-    throw new Error(
-      "Insufficient trade data found for the specified pool and time period."
-    );
+    return 0;
+    // throw new Error(
+    //   "Insufficient trade data found for the specified pool and time period."
+    // );
   }
 
   // Sample at 5-minute intervals
@@ -82,11 +83,8 @@ export async function rollingRealizedVolatility(
     const windowEnd = new Date(currentEnd);
 
     try {
-      const volatilityValue = await calcRealizedVolatility(
-        pool_id,
-        windowStart,
-        windowEnd
-      );
+      const volatilityValue =
+        (await calcRealizedVolatility(pool_id, windowStart, windowEnd)) || 0;
 
       await db
         .insert(volatility)

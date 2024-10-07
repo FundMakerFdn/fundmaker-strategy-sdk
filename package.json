@@ -4,8 +4,6 @@
   "main": "src/index.js",
   "type": "module",
   "scripts": {
-    "start": "node src/index.js",
-    "simulate": "node src/simulate.js",
     "print-pools": "node tools/pools-csv.js -p",
     "export-pools": "node tools/pools-csv.js -e",
     "import-pools": "node tools/pools-csv.js -i",

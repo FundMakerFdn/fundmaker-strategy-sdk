@@ -5,11 +5,11 @@ import { simulatePosition } from "#src/simulate.js";
 import db from "#src/database.js";
 import { trades, volatility } from "#src/schema.js";
 import { eq, and, gte } from "drizzle-orm";
-import { findFirstMissingHourlyInterval, getPoolById } from "#src/db-utils.js";
+import { checkLiquidityIntegrity, getPoolById } from "#src/db-utils.js";
 import { fetchData } from "#src/fetcher.js";
 import CONFIG from "#src/config.js";
 import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
-import { fetchPool } from "../src/fetch-utils.js";
+import { fetchPool } from "#src/fetch-utils.js";
 
 // Function to read CSV file using fast-csv
 function parseCSV(filePath) {
@@ -178,19 +178,19 @@ async function main(opts) {
   for (const strategy of strategyJSON) {
     console.log(`Executing strategy "${strategy.strategyName}"`);
     for (const poolRow of poolsCSV) {
-      if (CONFIG.VERBOSE) console.log("Pool", poolRow.poolAddress);
+      console.log("Pool", poolRow.poolType, poolRow.poolAddress);
       const poolId = await fetchPool(poolRow.poolType, poolRow.poolAddress);
       const startDate = new Date(poolRow.startDate);
       const endDate = new Date(poolRow.endDate);
 
       if (opts.checks) {
         console.log("Checking data integrity...");
-        const missingData = await findFirstMissingHourlyInterval(
+        const didFetch = await checkLiquidityIntegrity(
           poolId,
           startDate,
           endDate
         );
-        if (missingData) {
+        if (!didFetch) {
           console.log("Fetching the data...");
           await fetchData({ ...poolRow, poolId, startDate, endDate });
         }
@@ -207,7 +207,8 @@ async function main(opts) {
       );
       const pnlArr = positions.map((p) => p.pnlPercent);
       const avgPnL = pnlArr.reduce((a, r) => a + r, 0) / pnlArr.length;
-      const sharpe = avgPnL / calculateStandardDeviation(pnlArr);
+      const std = calculateStandardDeviation(pnlArr);
+      const sharpe = std !== 0 ? avgPnL / std : 0;
       results.push({
         strategyName: strategy.strategyName,
         poolType: poolRow.poolType,

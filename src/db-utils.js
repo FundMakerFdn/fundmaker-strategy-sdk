@@ -1,6 +1,6 @@
 import db from "./database.js";
 import { pools, trades, liquidity, fee_tiers } from "./schema.js";
-import { sql, and, eq, between, gte } from "drizzle-orm";
+import { sql, and, eq, lte, between, gte, count } from "drizzle-orm";
 import { handle } from "./misc-utils.js";
 import CONFIG from "./config.js";
 
@@ -187,37 +187,31 @@ export async function batchInsert(db, table, items, chunkSize = 999) {
   }
 }
 
-export async function findFirstMissingHourlyInterval(
-  poolId,
-  startDate,
-  endDate
-) {
-  // Find if there is an interval of length checkIntMs with 0 trades
+export async function checkLiquidityIntegrity(poolId, startDate, endDate) {
   const startTimestamp = Math.floor(new Date(startDate).getTime());
   const endTimestamp = Math.floor(new Date(endDate).getTime());
-  const checkIntMs = 3600000; // 1 hour
 
-  const hourlyIntervals = sql`
-    WITH RECURSIVE hourly_intervals AS (
-      SELECT ${startTimestamp} AS interval_start
-      UNION ALL
-      SELECT interval_start + ${checkIntMs}
-      FROM hourly_intervals
-      WHERE interval_start + ${checkIntMs} <= ${endTimestamp}
+  // Calculate the number of hours between start and end dates
+  const hoursBetween =
+    Math.floor((endTimestamp - startTimestamp) / 3600000) - 1;
+
+  // Count liquidity datapoints using Drizzle ORM
+  const result = await db
+    .select({ datapoint_count: count() })
+    .from(liquidity)
+    .where(
+      and(
+        eq(liquidity.pool_id, poolId),
+        gte(liquidity.timestamp, startTimestamp),
+        lte(liquidity.timestamp, endTimestamp)
+      )
     )
-    SELECT interval_start
-    FROM hourly_intervals
-    LEFT JOIN ${trades} 
-      ON ${trades.timestamp} >= interval_start
-      AND ${trades.timestamp} < interval_start + ${checkIntMs}
-      AND ${trades.pool_id} = ${poolId}
-    WHERE ${trades.id} IS NULL
-    LIMIT 1;
-  `;
+    .execute();
 
-  const result = await db.all(hourlyIntervals);
+  const datapointCount = result[0].datapoint_count;
 
-  return result.length > 0 ? result[0].interval_start : null;
+  // Compare datapoint count with the number of hours
+  return datapointCount >= hoursBetween;
 }
 
 export function getAllTrades(pool_id, startDate, endDate) {
