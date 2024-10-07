@@ -1,15 +1,7 @@
 import db from "#src/database.js";
 import { trades, volatility, pools } from "#src/schema.js";
 import { and, eq, between } from "drizzle-orm";
-import { decodePrice } from "#src/pool-math.js";
-
-function calculateStandardDeviation(values) {
-  const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
-  const variance =
-    values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
-    values.length;
-  return Math.sqrt(variance);
-}
+import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
 
 export async function calcRealizedVolatility(pool_id, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime());

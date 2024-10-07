@@ -12,7 +12,7 @@ import {
 } from "#src/db-utils.js";
 import { fetchData } from "#src/fetcher.js";
 import CONFIG from "#src/config.js";
-import { decodePrice } from "#src/pool-math.js";
+import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
 import { fetchPool } from "../src/fetch-utils.js";
 
 function parseCSV(filePath) {
@@ -182,10 +182,15 @@ async function main(opts) {
         endDate,
         strategy
       );
+      const pnlArr = positions.map((p) => p.pnlPercent);
+      const avgPnL = pnlArr.reduce((a, r) => a + r, 0) / pnlArr.length;
+      const sharpe = avgPnL / calculateStandardDeviation(pnlArr);
       results.push({
         strategyName: strategy.strategyName,
         poolAddress: poolRow.poolAddress,
         positions: positions,
+        avgPnL,
+        sharpe,
       });
     }
   }
@@ -207,6 +212,8 @@ async function main(opts) {
         }`
       );
     });
+    console.log("Average PnL %:", result.avgPnL);
+    console.log("Sharpe ratio:", result.sharpe);
   });
 
   fs.writeFileSync(opts.output, csvContent.join("\n"));

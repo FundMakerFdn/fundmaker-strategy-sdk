@@ -10,7 +10,6 @@ import { rollingRealizedVolatility } from "./volatility.js";
 import { getPoolById } from "#src/db-utils.js";
 
 export async function fetchData(config) {
-  debugger;
   // padding the start and end date to ensure the data on the "edges" is retrieved
   const startDate = padDateMS(-CONFIG.FETCH_PAD_MS, config.startDate);
   const endDate = padDateMS(CONFIG.FETCH_PAD_MS, config.endDate);
