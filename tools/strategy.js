@@ -1,7 +1,6 @@
 import fs from "fs";
 import { program } from "commander";
-import csvParser from "csv-parser";
-import { createObjectCsvWriter } from "csv-writer";
+import { parse, format } from "fast-csv"; // Replaced csv-parser and csv-writer with fast-csv
 import { simulatePosition } from "#src/simulate.js";
 import db from "#src/database.js";
 import { trades, volatility } from "#src/schema.js";
@@ -12,12 +11,12 @@ import CONFIG from "#src/config.js";
 import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
 import { fetchPool } from "../src/fetch-utils.js";
 
+// Function to read CSV file using fast-csv
 function parseCSV(filePath) {
   return new Promise((resolve, reject) => {
     const rowsCSV = [];
-
     fs.createReadStream(filePath)
-      .pipe(csvParser())
+      .pipe(parse({ headers: true }))
       .on("data", (row) => rowsCSV.push(row))
       .on("error", (err) => {
         reject(`Error reading file ${filePath}: ${err}`);
@@ -61,7 +60,6 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 
         if (positionAge >= maxPositionAge) {
           openPosition.closeTimestamp = closeCheckTime.getTime();
-
           positions.push(openPosition);
           openPosition = null;
         }
@@ -135,7 +133,7 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       downtickPercent: strategy.priceRange.downtickPercent,
       amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
     });
-    console.log(`Closed position with PnL: ${pnlPercent}%`);
+    console.log("Closed position with PnL (%):", pnlPercent);
     position.pnlPercent = pnlPercent;
     positionsSim.push(position);
   }
@@ -143,37 +141,31 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
   return positionsSim;
 }
 
+// Writing CSV output using fast-csv
 async function writeOutputCSV(results, outputFile) {
-  const csvWriter = createObjectCsvWriter({
-    path: outputFile,
-    header: [
-      "strategyName",
-      "poolType",
-      "poolAddress",
-      "openTimestamp",
-      "closeTimestamp",
-      "openPrice",
-      "targetUptickPrice",
-      "targetDowntickPrice",
-      "pnlPercent",
-    ],
-  });
+  const csvStream = format({ headers: true });
+  const writableStream = fs.createWriteStream(outputFile);
 
-  const records = results.flatMap((result) =>
-    result.positions.map((position) => ({
-      strategyName: result.strategyName,
-      poolType: result.poolType,
-      poolAddress: result.poolAddress,
-      openTimestamp: new Date(position.openTimestamp).toISOString(),
-      closeTimestamp: new Date(position.closeTimestamp).toISOString(),
-      openPrice: position.openPrice,
-      targetUptickPrice: position.targetUptickPrice,
-      targetDowntickPrice: position.targetDowntickPrice,
-      pnlPercent: position.pnlPercent,
-    }))
-  );
+  csvStream.pipe(writableStream);
 
-  await csvWriter.writeRecords(records);
+  results
+    .flatMap((result) =>
+      result.positions.map((position) => ({
+        strategyName: result.strategyName,
+        poolType: result.poolType,
+        poolAddress: result.poolAddress,
+        openTimestamp: new Date(position.openTimestamp).toISOString(),
+        closeTimestamp: new Date(position.closeTimestamp).toISOString(),
+        openPrice: position.openPrice,
+        targetUptickPrice: position.targetUptickPrice,
+        targetDowntickPrice: position.targetDowntickPrice,
+        pnlPercent: position.pnlPercent,
+      }))
+    )
+    .forEach((record) => csvStream.write(record));
+
+  csvStream.end();
+
   console.log(`Results written to ${outputFile}`);
 }
 
@@ -191,8 +183,8 @@ async function main(opts) {
       const startDate = new Date(poolRow.startDate);
       const endDate = new Date(poolRow.endDate);
 
-      if (opts.noChecks) {
-        if (CONFIG.VERBOSE) console.log("Checking data integrity...");
+      if (opts.checks) {
+        console.log("Checking data integrity...");
         const missingData = await findFirstMissingHourlyInterval(
           poolId,
           startDate,
@@ -200,7 +192,7 @@ async function main(opts) {
         );
         if (missingData) {
           console.log("Fetching the data...");
-          await fetchData({ ...poolRow, startDate, endDate });
+          await fetchData({ ...poolRow, poolId, startDate, endDate });
         }
       }
 
@@ -226,7 +218,8 @@ async function main(opts) {
       });
     }
   }
-  // Write results to output CSV using the new function
+
+  // Write results to output CSV using fast-csv
   await writeOutputCSV(results, opts.output);
 
   // Log summary statistics

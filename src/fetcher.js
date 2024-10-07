@@ -1,5 +1,4 @@
 import {
-  fetchPool,
   fetchDailyTrades,
   fetchLiquidity,
   fetchFeeTiers,
