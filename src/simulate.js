@@ -25,6 +25,7 @@ function printPosition(pool, [amount0, amount1]) {
 }
 
 export async function simulatePosition(position) {
+  if (!position.amountUSD) position.amountUSD = CONFIG.DEFAULT_POS_USD;
   const p = position.invPrices ? (p) => 1 / p : (p) => p;
   let pool, open, close;
 
@@ -138,8 +139,9 @@ export async function simulatePosition(position) {
   const totalPnLPercent = (newValueUSD / position.amountUSD - 1) * 100;
   console.log("Total PnL (USD):", totalPnL);
   console.log("Total PnL (%):", totalPnLPercent);
+  console.log("-------------------");
 
   return totalPnLPercent;
 }
 
-simulatePosition(CONFIG.position);
+//simulatePosition(CONFIG.position);

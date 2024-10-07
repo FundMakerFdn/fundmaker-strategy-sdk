@@ -24,7 +24,10 @@ const CONFIG = {
   // Fetch also one day before and after the period
   FETCH_PAD_MS: 24 * 60 * 60000,
 
-  VERBOSE: true,
+  // Default simulation position size
+  DEFAULT_POS_USD: 100,
+
+  VERBOSE: false,
 };
 
 /*CONFIG.position = {

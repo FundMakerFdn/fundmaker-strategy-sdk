@@ -2,7 +2,7 @@
   {
     "strategyName": "Strategy 1",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 0.5,
+    "volatilityThreshold": 12,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {

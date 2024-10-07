@@ -258,3 +258,12 @@ export function getAllTrades(pool_id, startDate, endDate) {
   const res = db.all(query);
   return res;
 }
+
+export const getPoolById = handle(async (poolId) => {
+  const rows = await db
+    .select()
+    .from(pools)
+    .where(eq(pools.id, poolId))
+    .limit(1);
+  return rows[0];
+}, "getting pool by id");

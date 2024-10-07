@@ -7,20 +7,23 @@ import {
 import CONFIG from "./config.js";
 import { padDateMS } from "./misc-utils.js";
 import { rollingRealizedVolatility } from "./volatility.js";
+import { getPoolById } from "#src/db-utils.js";
 
 export async function fetchData(config) {
+  debugger;
   // padding the start and end date to ensure the data on the "edges" is retrieved
   const startDate = padDateMS(-CONFIG.FETCH_PAD_MS, config.startDate);
   const endDate = padDateMS(CONFIG.FETCH_PAD_MS, config.endDate);
   //const poolId = await fetchPool(config.poolType, config.poolAddress);
+  const pool = await getPoolById(config.poolId);
 
   console.log("Fetching liquidity...");
 
-  fetchLiquidity(config.poolType, config.poolId, startDate, endDate);
+  fetchLiquidity(pool, startDate, endDate);
 
   if (CONFIG.DYNAMIC_FEE_POOLS.includes(config.poolType)) {
     console.log("Fetching fee tiers...");
-    fetchFeeTiers(config.poolType, config.poolId, startDate, endDate);
+    fetchFeeTiers(pool, startDate, endDate);
   }
 
   // Fetch trades last, since trades are used to
@@ -28,7 +31,7 @@ export async function fetchData(config) {
   let currentDate = new Date(startDate); // copy by value, not reference
   while (currentDate < endDate) {
     let nextDate = new Date(currentDate);
-    nextDate.setDate(nextDate.getDate() + 1);
+    nextDate.setUTCDate(nextDate.getDate() + 1);
     nextDate = new Date(Math.min(nextDate, endDate));
 
     await fetchDailyTrades({ ...config }, currentDate, nextDate);
@@ -38,7 +41,7 @@ export async function fetchData(config) {
   console.log("Fetched trades.");
 
   console.log("Calculating realized volatility...");
-  rollingRealizedVolatility(config.poolId, startDate, endDate);
+  await rollingRealizedVolatility(config.poolId, startDate, endDate);
 }
 
 // Start the main function

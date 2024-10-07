@@ -38,7 +38,7 @@ export async function savePoolMetadata(poolType, pool) {
   }
 }
 
-export async function saveTradesToDatabase(tradesData, poolId) {
+export async function saveTradesToDatabase(tradesData) {
   try {
     await batchInsert(db, trades, tradesData);
   } catch (err) {
@@ -47,7 +47,7 @@ export async function saveTradesToDatabase(tradesData, poolId) {
   }
 }
 
-export async function saveLiquidityToDatabase(liquidityData, poolId) {
+export async function saveLiquidityToDatabase(liquidityData) {
   try {
     await batchInsert(db, liquidity, liquidityData);
   } catch (err) {
@@ -113,24 +113,24 @@ export async function fetchDailyTrades(
   );
 }
 
-export async function fetchLiquidity(poolType, poolId, startDate, endDate) {
+export async function fetchLiquidity(pool, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
 
   let liquidityData = await queryPoolLiquidity(
-    poolType,
-    CONFIG.POOL_ADDRESS,
+    pool.type,
+    pool.address,
     startTimestamp,
     endTimestamp,
     0
   );
   liquidityData = liquidityData.map((liquidityPoint) => ({
-    pool_id: poolId,
+    pool_id: pool.id,
     timestamp: parseInt(liquidityPoint.periodStartUnix * 1000),
     liquidity: liquidityPoint.liquidity,
   }));
 
-  saveLiquidityToDatabase(liquidityData, poolId);
+  saveLiquidityToDatabase(liquidityData, pool.id);
 
   console.log(
     `Finished fetching liquidity for ${startDate.toISOString()} to ${endDate.toISOString()}`
@@ -146,12 +146,12 @@ export async function saveFeeTiersToDatabase(feeTiersData, poolId) {
   }
 }
 
-export async function fetchFeeTiers(poolType, poolId, startDate, endDate) {
+export async function fetchFeeTiers(pool, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime() / 1000);
   const endTimestamp = Math.floor(endDate.getTime() / 1000);
   let feeTiersData = await queryPoolFeeTiers(
-    poolType,
-    CONFIG.POOL_ADDRESS,
+    pool.type,
+    pool.address,
     startTimestamp,
     endTimestamp,
     0
@@ -159,9 +159,9 @@ export async function fetchFeeTiers(poolType, poolId, startDate, endDate) {
   feeTiersData = feeTiersData.map((hourFee) => ({
     ...hourFee,
     timestamp: Number(hourFee.timestamp) * 1000,
-    pool_id: poolId,
+    pool_id: pool.id,
   }));
-  saveFeeTiersToDatabase(feeTiersData, poolId);
+  saveFeeTiersToDatabase(feeTiersData, pool.id);
   console.log(
     `Finished fetching feeTiers for ${startDate.toISOString()} to ${endDate.toISOString()}`
   );
