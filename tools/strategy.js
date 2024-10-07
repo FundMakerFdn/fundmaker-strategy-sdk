@@ -44,7 +44,7 @@ async function getLatestDatapoint(db, table, poolId, timestamp) {
 }
 
 async function executeStrategy(db, pool, startDate, endDate, strategy) {
-  const positions = [];
+  let positions = [];
   let currentDate = new Date(startDate);
   const endDateTime = new Date(endDate).getTime();
   let openPosition = null;
@@ -65,24 +65,8 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
         if (positionAge >= maxPositionAge) {
           openPosition.closeTimestamp = closeCheckTime.getTime();
 
-          // Simulate PnL percentage using simulatePosition
-          const pnlPercent = await simulatePosition({
-            poolType: pool.type,
-            poolAddress: pool.address,
-            openTime: new Date(openPosition.openTimestamp),
-            closeTime: new Date(openPosition.closeTimestamp),
-            uptickPercent: strategy.priceRange.uptickPercent,
-            downtickPercent: strategy.priceRange.downtickPercent,
-            amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
-          });
-
-          // Add PnL percent to the openPosition object
-          openPosition.pnlPercent = pnlPercent;
           positions.push(openPosition);
           openPosition = null;
-
-          // Log PnL for debugging purposes
-          console.log(`Closed position with PnL: ${pnlPercent}%`);
         }
       }
     }
@@ -142,7 +126,24 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
     positions.push(openPosition);
   }
 
-  return positions;
+  let positionsSim = [];
+  for (let position of positions) {
+    // Simulate PnL percentage using simulatePosition
+    const pnlPercent = await simulatePosition({
+      poolType: pool.type,
+      poolAddress: pool.address,
+      openTime: new Date(position.openTimestamp),
+      closeTime: new Date(position.closeTimestamp),
+      uptickPercent: strategy.priceRange.uptickPercent,
+      downtickPercent: strategy.priceRange.downtickPercent,
+      amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
+    });
+    console.log(`Closed position with PnL: ${pnlPercent}%`);
+    position.pnlPercent = pnlPercent;
+    positionsSim.push(position);
+  }
+
+  return positionsSim;
 }
 
 async function main(opts) {

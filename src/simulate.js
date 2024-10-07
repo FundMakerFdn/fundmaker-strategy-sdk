@@ -19,9 +19,11 @@ async function getDecodedPrices(pool, timestamp) {
   };
 }
 
+const log = (...args) => CONFIG.VERBOSE && console.log(...args);
+
 function printPosition(pool, [amount0, amount1]) {
-  console.log(`Position ${pool.token0Symbol}: ${amount0}`);
-  console.log(`Position ${pool.token1Symbol}: ${amount1}`);
+  log(`Position ${pool.token0Symbol}: ${amount0}`);
+  log(`Position ${pool.token1Symbol}: ${amount1}`);
 }
 
 export async function simulatePosition(position) {
@@ -35,17 +37,17 @@ export async function simulatePosition(position) {
     close = await getDecodedPrices(pool, position.closeTime);
   } catch (err) {
     console.error("Failed to read local DB, please fetch the data");
-    console.log(err);
+    log(err);
     return;
   }
 
   const priceHigh = open.price + (open.price * position.uptickPercent) / 100;
   const priceLow = open.price - (open.price * position.downtickPercent) / 100;
 
-  console.log("Position value (USD):", position.amountUSD);
-  console.log("Entry price:", p(open.price));
-  console.log("Price low, high:", ...mm(p(priceHigh), p(priceLow)));
-  console.log("Token prices at open:", open.price0, open.price1);
+  log("Position value (USD):", position.amountUSD);
+  log("Entry price:", p(open.price));
+  log("Price low, high:", ...mm(p(priceHigh), p(priceLow)));
+  log("Token prices at open:", open.price0, open.price1);
 
   // Calculate initial position
   let pos = getTokensAmountFromDepositAmountUSD(
@@ -58,11 +60,11 @@ export async function simulatePosition(position) {
   );
   printPosition(pool, [pos.amount0, pos.amount1]);
 
-  console.log("Calculating fees");
+  log("Calculating fees");
 
   // Fetch all trades within the interval
   const trades = getAllTrades(pool.id, position.openTime, position.closeTime);
-  console.log(`Simulating ${trades.length} trades...`);
+  log(`Simulating ${trades.length} trades...`);
 
   let feesCollected = 0;
   let future = { ...pos };
@@ -80,19 +82,12 @@ export async function simulatePosition(position) {
     if (tradePrice < priceLow || tradePrice > priceHigh) {
       if (inRange) {
         // If the price leaves the range, freeze the token amounts
-        if (CONFIG.VERBOSE)
-          console.log(
-            "OUT OF RANGE:",
-            tradePrice,
-            future.amount0,
-            future.amount1
-          );
+        log("OUT OF RANGE:", tradePrice, future.amount0, future.amount1);
         inRange = false;
       }
     } else {
       if (!inRange) {
-        if (CONFIG.VERBOSE)
-          console.log("IN RANGE:", tradePrice, future.amount0, future.amount1);
+        log("IN RANGE:", tradePrice, future.amount0, future.amount1);
         inRange = true;
       }
 
@@ -119,11 +114,11 @@ export async function simulatePosition(position) {
     }
   }
 
-  if (CONFIG.SHOW_SIMULATION_PROGRESS) console.log("");
-  console.log("Fees collected by position (USD):", feesCollected);
+  if (CONFIG.SHOW_SIMULATION_PROGRESS) log("");
+  log("Fees collected by position (USD):", feesCollected);
 
-  console.log("Exit price:", p(close.price));
-  console.log("Token prices at close:", close.price0, close.price1);
+  log("Exit price:", p(close.price));
+  log("Token prices at close:", close.price0, close.price1);
 
   const { totalValueB: newValueUSD, ILPercentage } = calculateIL(
     [close.price0, close.price1],
@@ -132,14 +127,14 @@ export async function simulatePosition(position) {
     pos.amount0,
     pos.amount1
   );
-  console.log("IL (%):", ILPercentage);
-  console.log("Position value (USD):", newValueUSD);
+  log("IL (%):", ILPercentage);
+  log("Position value (USD):", newValueUSD);
 
   const totalPnL = newValueUSD - position.amountUSD;
   const totalPnLPercent = (newValueUSD / position.amountUSD - 1) * 100;
-  console.log("Total PnL (USD):", totalPnL);
-  console.log("Total PnL (%):", totalPnLPercent);
-  console.log("-------------------");
+  log("Total PnL (USD):", totalPnL);
+  log("Total PnL (%):", totalPnLPercent);
+  log("-------------------");
 
   return totalPnLPercent;
 }
