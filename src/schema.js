@@ -3,31 +3,45 @@ import {
   integer,
   text,
   uniqueIndex,
+  index,
 } from "drizzle-orm/sqlite-core";
 
-export const pools = sqliteTable("pools", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  type: text("type").notNull().default("uniswapv3"), // uniswapv3 | thena
-  address: text("address").notNull().unique(),
-  token0Symbol: text("token0Symbol").notNull(),
-  token1Symbol: text("token1Symbol").notNull(),
-  token0Decimals: integer("token0Decimals").notNull(),
-  token1Decimals: integer("token1Decimals").notNull(),
-  feeTier: text("feeTier"),
-  created: integer("timestamp").notNull(),
-});
+export const pools = sqliteTable(
+  "pools",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    type: text("type").notNull().default("uniswapv3"), // uniswapv3 | thena
+    address: text("address").notNull().unique(),
+    token0Symbol: text("token0Symbol").notNull(),
+    token1Symbol: text("token1Symbol").notNull(),
+    token0Decimals: integer("token0Decimals").notNull(),
+    token1Decimals: integer("token1Decimals").notNull(),
+    feeTier: text("feeTier"),
+    created: integer("timestamp").notNull(),
+  },
+  (table) => ({
+    createdIdx: index("pools_created_idx").on(table.created),
+  })
+);
 
-export const trades = sqliteTable("trades", {
-  id: integer("id").primaryKey({ autoIncrement: true }),
-  txid: text("txid").notNull(),
-  timestamp: integer("timestamp").notNull(),
-  pool_id: integer("pool_id").references(() => pools.id),
-  amount0: text("amount0").notNull(),
-  amount1: text("amount1").notNull(),
-  amountUSD: text("amountUSD").notNull(),
-  sqrtPriceX96: integer("sqrtPriceX96").notNull(),
-  tick: text("tick").notNull(),
-});
+export const trades = sqliteTable(
+  "trades",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    txid: text("txid").notNull(),
+    timestamp: integer("timestamp").notNull(),
+    pool_id: integer("pool_id").references(() => pools.id),
+    amount0: text("amount0").notNull(),
+    amount1: text("amount1").notNull(),
+    amountUSD: text("amountUSD").notNull(),
+    sqrtPriceX96: integer("sqrtPriceX96").notNull(),
+    tick: text("tick").notNull(),
+  },
+  (table) => ({
+    timestampIdx: index("trades_timestamp_idx").on(table.timestamp),
+    sqrtPriceX96Idx: index("trades_sqrtPriceX96_idx").on(table.sqrtPriceX96),
+  })
+);
 
 export const liquidity = sqliteTable(
   "liquidity",
@@ -38,17 +52,15 @@ export const liquidity = sqliteTable(
       .notNull(),
     timestamp: integer("timestamp").notNull(),
     liquidity: integer("liquidity").notNull(),
-
-    // Add composite unique constraint on (pool_id, timestamp)
   },
-  (table) => {
-    return {
-      liquidityUniquePoolIdTimestamp: uniqueIndex(
-        "liquidity_unique_pool_id_timestamp"
-      ).on(table.pool_id, table.timestamp),
-    };
-  }
+  (table) => ({
+    liquidityUniquePoolIdTimestamp: uniqueIndex(
+      "liquidity_unique_pool_id_timestamp"
+    ).on(table.pool_id, table.timestamp),
+    timestampIdx: index("liquidity_timestamp_idx").on(table.timestamp),
+  })
 );
+
 export const fee_tiers = sqliteTable(
   "fee_tiers",
   {
@@ -58,16 +70,13 @@ export const fee_tiers = sqliteTable(
       .notNull(),
     timestamp: integer("timestamp").notNull(),
     feeTier: integer("feeTier").notNull(),
-
-    // Add composite unique constraint on (pool_id, timestamp)
   },
-  (table) => {
-    return {
-      feeTiersUniquePoolIdTimestamp: uniqueIndex(
-        "fee_tiers_unique_pool_id_timestamp"
-      ).on(table.pool_id, table.timestamp),
-    };
-  }
+  (table) => ({
+    feeTiersUniquePoolIdTimestamp: uniqueIndex(
+      "fee_tiers_unique_pool_id_timestamp"
+    ).on(table.pool_id, table.timestamp),
+    timestampIdx: index("fee_tiers_timestamp_idx").on(table.timestamp),
+  })
 );
 
 export const volatility = sqliteTable(
@@ -79,14 +88,11 @@ export const volatility = sqliteTable(
       .notNull(),
     timestamp: integer("timestamp").notNull(),
     realizedVolatility: text("realizedVolatility").notNull(),
-
-    // Add composite unique constraint on (pool_id, timestamp)
   },
-  (table) => {
-    return {
-      volatilityUniquePoolIdTimestamp: uniqueIndex(
-        "volatility_unique_pool_id_timestamp"
-      ).on(table.pool_id, table.timestamp),
-    };
-  }
+  (table) => ({
+    volatilityUniquePoolIdTimestamp: uniqueIndex(
+      "volatility_unique_pool_id_timestamp"
+    ).on(table.pool_id, table.timestamp),
+    timestampIdx: index("volatility_timestamp_idx").on(table.timestamp),
+  })
 );
