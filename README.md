@@ -24,7 +24,7 @@ After, you can use the commands below.
 
 _Alias for `node tools/strategy.js`_
 
-The main tool, which executes trading strategies on cryptocurrency pools based on historical data. It processes input from CSV files, applies defined strategies, and outputs the results.
+The main tool, which executes liquidity providing strategies on cryptocurrency pools based on historical data. It processes input from CSV files, applies defined strategies, and outputs the results.
 
 ```
 Usage: strategy [options]
