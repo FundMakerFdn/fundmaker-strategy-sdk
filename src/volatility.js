@@ -2,6 +2,7 @@ import db from "#src/database.js";
 import { trades, volatility, pools } from "#src/schema.js";
 import { and, eq, between } from "drizzle-orm";
 import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
+import { batchInsert } from "#src/db-utils.js";
 
 export async function calcRealizedVolatility(pool_id, startDate, endDate) {
   const startTimestamp = Math.floor(startDate.getTime());
@@ -69,10 +70,12 @@ export async function rollingRealizedVolatility(
   startDate,
   endDate,
   intervalSize = 600000,
-  windowSize = 3600000
+  windowSize = 3600000,
+  batchSize = 4320
 ) {
   const startTimestamp = Math.floor(startDate.getTime());
   const endTimestamp = Math.floor(endDate.getTime());
+  let batch = [];
 
   for (
     let currentEnd = endTimestamp;
@@ -81,26 +84,30 @@ export async function rollingRealizedVolatility(
   ) {
     const windowStart = new Date(currentEnd - windowSize);
     const windowEnd = new Date(currentEnd);
-
     try {
       const volatilityValue =
         (await calcRealizedVolatility(pool_id, windowStart, windowEnd)) || 0;
 
-      await db
-        .insert(volatility)
-        .values({
-          pool_id: pool_id,
-          timestamp: currentEnd,
-          realizedVolatility: volatilityValue.toString(),
-        })
-        .onConflictDoUpdate({
-          target: [volatility.pool_id, volatility.timestamp],
-          set: { realizedVolatility: volatilityValue.toString() },
-        });
+      batch.push({
+        pool_id: pool_id,
+        timestamp: currentEnd,
+        realizedVolatility: volatilityValue.toString(),
+      });
+
+      // When the batch reaches the specified size, insert it and reset
+      if (batch.length >= batchSize) {
+        await batchInsert(db, volatility, batch);
+        batch = [];
+      }
     } catch (error) {
       console.error(
         `Error calculating volatility for pool ${pool_id} at timestamp ${currentEnd}: ${error.message}`
       );
     }
+  }
+
+  // Insert any remaining items in the batch
+  if (batch.length > 0) {
+    await batchInsert(db, volatility, batch);
   }
 }

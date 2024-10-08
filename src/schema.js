@@ -17,7 +17,7 @@ export const pools = sqliteTable(
     token0Decimals: integer("token0Decimals").notNull(),
     token1Decimals: integer("token1Decimals").notNull(),
     feeTier: text("feeTier"),
-    created: integer("timestamp").notNull(),
+    created: integer("created").notNull(),
   },
   (table) => ({
     createdIdx: index("pools_created_idx").on(table.created),
@@ -87,7 +87,7 @@ export const volatility = sqliteTable(
       .references(() => pools.id)
       .notNull(),
     timestamp: integer("timestamp").notNull(),
-    realizedVolatility: text("realizedVolatility").notNull(),
+    realizedVolatility: integer("realizedVolatility").notNull(),
   },
   (table) => ({
     volatilityUniquePoolIdTimestamp: uniqueIndex(
