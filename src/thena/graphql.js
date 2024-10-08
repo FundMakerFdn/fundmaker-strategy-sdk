@@ -13,6 +13,7 @@ export const poolMetadataGraphQL = (poolAddress) => `
           decimals
         }
         feeTier:fee
+        created:createdAtTimestamp
       }
     }
   `;
