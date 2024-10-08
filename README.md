@@ -59,7 +59,7 @@ Notice that `startDate` defaults to the creation date of the pool, `endDate` def
   {
     "strategyName": "Strategy 1",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 8,
+    "volatilityThreshold": 20,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
