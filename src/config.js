@@ -6,9 +6,10 @@ const CONFIG = {
   POOL_TYPE: "thena", // uniswapv3, thena
   START_DATE: new Date("2024-09-14T17:12:00.000Z"), // data fetch start date
   END_DATE: new Date("2024-09-30T11:12:00.000Z"), // data fetch end date
+
   BATCH_SIZE: 1000,
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
-  SHOW_SIMULATION_PROGRESS: true, // print a dot for each hour simulated
+  RETRY_COUNT: 3, // if request failed
 
   SUBGRAPH_URLS: {
     uniswapv3: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV`,

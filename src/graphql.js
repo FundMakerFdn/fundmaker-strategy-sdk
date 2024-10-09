@@ -1,4 +1,5 @@
 import axios from "axios";
+import axiosRetry from "axios-retry";
 import CONFIG from "#src/config.js";
 import { delay } from "#src/misc-utils.js";
 
@@ -7,6 +8,11 @@ import * as thena from "./thena/graphql.js";
 
 const getSubgraphURL = (type) => CONFIG.SUBGRAPH_URLS[type];
 const q = { uniswapv3, thena };
+
+axiosRetry(axios, {
+  retries: CONFIG.RETRY_COUNT,
+  retryDelay: CONFIG.DELAY_BETWEEN_REQUESTS,
+});
 
 // Helper function to send GraphQL queries
 async function sendGraphQLQuery(poolType, query) {
