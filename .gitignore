@@ -3,6 +3,8 @@ drizzle/
 input/
 *.csv
 
+.aider.*
+
 # Logs
 logs
 *.log

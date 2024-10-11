@@ -17,11 +17,11 @@ export async function fetchData(config) {
 
   console.log("Fetching liquidity...");
 
-  fetchLiquidity(pool, startDate, endDate);
+  await fetchLiquidity(pool, startDate, endDate);
 
   if (CONFIG.DYNAMIC_FEE_POOLS.includes(config.poolType)) {
     console.log("Fetching fee tiers...");
-    fetchFeeTiers(pool, startDate, endDate);
+    await fetchFeeTiers(pool, startDate, endDate);
   }
 
   // Fetch trades last, since trades are used to
