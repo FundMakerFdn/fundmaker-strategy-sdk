@@ -9,7 +9,6 @@ const CONFIG = {
 
   BATCH_SIZE: 1000,
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
-  RETRY_COUNT: 3, // if request failed
 
   SUBGRAPH_URLS: {
     uniswapv3: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV`,

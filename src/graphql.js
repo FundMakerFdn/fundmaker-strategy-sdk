@@ -1,5 +1,4 @@
 import axios from "axios";
-import axiosRetry from "axios-retry";
 import CONFIG from "#src/config.js";
 import { delay } from "#src/misc-utils.js";
 
@@ -9,22 +8,25 @@ import * as thena from "./thena/graphql.js";
 const getSubgraphURL = (type) => CONFIG.SUBGRAPH_URLS[type];
 const q = { uniswapv3, thena };
 
-axiosRetry(axios, {
-  retries: CONFIG.RETRY_COUNT,
-  retryDelay: CONFIG.DELAY_BETWEEN_REQUESTS,
-});
-
 // Helper function to send GraphQL queries
 async function sendGraphQLQuery(poolType, query) {
-  try {
-    const response = await axios.post(getSubgraphURL(poolType), { query });
-    return response?.data?.data || null;
-  } catch (error) {
-    console.error(`Error fetching data for ${poolType}:`, error.message);
-    if (error.response) {
-      console.error("Error response:", error.response.data);
+  let retryCount = 0;
+  while (true) {
+    try {
+      const response = await axios.post(getSubgraphURL(poolType), { query });
+      return response?.data?.data || null;
+    } catch (error) {
+      retryCount++;
+      console.error(
+        `Error fetching data for ${poolType} (Attempt ${retryCount}):`,
+        error.message
+      );
+      if (error.response) {
+        console.error("Error response:", error.response.data);
+      }
+      console.log(`Retrying in ${CONFIG.DELAY_BETWEEN_REQUESTS}ms...`);
+      await delay(CONFIG.DELAY_BETWEEN_REQUESTS);
     }
-    return null;
   }
 }
 
