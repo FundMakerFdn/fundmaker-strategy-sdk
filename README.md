@@ -14,6 +14,7 @@ yarn migrate   # create the local db
 Next, you can edit `.env` and `src/config.js` to set the settings you need.
 
 ## .env example
+
 ```
 SUBGRAPH_API_KEY="...your 32-symbol API key..."
 ```
@@ -24,7 +25,7 @@ After, you can use the commands below.
 
 _Alias for `node tools/strategy.js`_
 
-The main tool, which executes liquidity providing strategies on cryptocurrency pools based on historical data. It processes input from CSV files, applies defined strategies, and outputs the results.
+The main tool, which executes trading strategies on cryptocurrency pools based on historical data. It processes input from CSV files, applies defined strategies, and outputs the results.
 
 ```
 Usage: strategy [options]
@@ -59,7 +60,7 @@ Notice that `startDate` defaults to the creation date of the pool, `endDate` def
   {
     "strategyName": "Strategy 1",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 20,
+    "volatilityThreshold": 8,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
@@ -84,7 +85,7 @@ _Alias for `node tools/pool-finder.js`_
 
 Find pool contract address by pair token symbols' names.
 
-Please note that `token0` and  `token1` order matters.
+Please note that `token0` and `token1` order matters.
 
 ```
 Usage: pool-finder [options] <token0> <token1> [feeTier]
@@ -104,6 +105,7 @@ Options:
 ### Usage examples
 
 1. Find a specific pool: `yarn pool-finder usdc weth 500`. Output:
+
 ```
 Searching...
 Search results:
@@ -116,6 +118,7 @@ Fee tier: 500 (0.0500000%)
 2. List all available fee tiers for the pair: `yarn pool-finder usdc weth`
 
 3. Find all pools with USDC as token1: `yarn pool-finder _ usdc`. Output:
+
 ```
 [...]
 

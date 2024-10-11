@@ -1,13 +1,13 @@
 [
   {
-    "strategyName": "Strategy 1",
+    "strategyName": "ETHUSDT_Thena",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 20,
+    "volatilityThreshold": 1,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
-      "uptickPercent": 2,
-      "downtickPercent": 3
+      "uptickPercent": 0.2,
+      "downtickPercent": 0.3
     }
   }
 ]
