@@ -10,7 +10,7 @@ export const pools = sqliteTable(
   "pools",
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
-    type: text("type").notNull().default("uniswapv3"), // uniswapv3 | thena
+    type: text("type").notNull().default("UniswapV3_ETH"), // UniswapV3_ETH | Thena_BSC
     address: text("address").notNull().unique(),
     token0Symbol: text("token0Symbol").notNull(),
     token1Symbol: text("token1Symbol").notNull(),

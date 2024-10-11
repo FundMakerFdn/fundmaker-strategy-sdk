@@ -2,11 +2,11 @@ import axios from "axios";
 import CONFIG from "#src/config.js";
 import { delay } from "#src/misc-utils.js";
 
-import * as uniswapv3 from "./uniswapv3/graphql.js";
-import * as thena from "./thena/graphql.js";
+import * as UniswapV3_ETH from "./UniswapV3_ETH/graphql.js";
+import * as Thena_BSC from "./Thena_BSC/graphql.js";
 
 const getSubgraphURL = (type) => CONFIG.SUBGRAPH_URLS[type];
-const q = { uniswapv3, thena };
+const q = { UniswapV3_ETH, Thena_BSC };
 
 // Helper function to send GraphQL queries
 async function sendGraphQLQuery(poolType, query) {

@@ -3,7 +3,7 @@ config();
 
 const CONFIG = {
   POOL_ADDRESS: "0x1123e75b71019962cd4d21b0f3018a6412edb63c",
-  POOL_TYPE: "thena", // uniswapv3, thena
+  POOL_TYPE: "Thena_BSC", // UniswapV3_ETH, Thena_BSC
   START_DATE: new Date("2024-09-14T17:12:00.000Z"), // data fetch start date
   END_DATE: new Date("2024-09-30T11:12:00.000Z"), // data fetch end date
 
@@ -11,12 +11,12 @@ const CONFIG = {
   DELAY_BETWEEN_REQUESTS: 1000, // in milliseconds
 
   SUBGRAPH_URLS: {
-    uniswapv3: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV`,
-    thena: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/Hnjf3ipVMCkQze3jmHp8tpSMgPmtPnXBR38iM4ix1cLt`,
+    UniswapV3_ETH: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/5zvR82QoaXYFyDEKLZ9t6v9adgnptxYpKpSbxtgVENFV`,
+    Thena_BSC: `https://gateway-arbitrum.network.thegraph.com/api/${process.env.SUBGRAPH_API_KEY}/subgraphs/id/Hnjf3ipVMCkQze3jmHp8tpSMgPmtPnXBR38iM4ix1cLt`,
   },
 
   // Pools with dynamic fee tiers
-  DYNAMIC_FEE_POOLS: ["thena"],
+  DYNAMIC_FEE_POOLS: ["Thena_BSC"],
 
   // Make sure that the swap reflects the current price
   SWAP_USD_THRESHOLD: 1,
