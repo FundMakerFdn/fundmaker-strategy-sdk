@@ -29,7 +29,7 @@ export async function fetchData(config) {
   let currentDate = new Date(startDate); // copy by value, not reference
   while (currentDate < endDate) {
     let nextDate = new Date(currentDate);
-    nextDate.setUTCDate(nextDate.getDate() + 1);
+    nextDate.setUTCDate(nextDate.getUTCDate() + 1);
     nextDate = new Date(Math.min(nextDate, endDate));
 
     await fetchDailyTrades({ ...config }, currentDate, nextDate);
