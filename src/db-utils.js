@@ -7,7 +7,7 @@ import {
   spot,
   volatility,
 } from "./schema.js";
-import { sql, and, eq, lte, between, gte, count } from "drizzle-orm";
+import { sql, and, eq, lte, between, gte, count, desc } from "drizzle-orm";
 import { handle } from "./misc-utils.js";
 import CONFIG from "./config.js";
 
@@ -274,7 +274,7 @@ export const getFirstSpotPrice = handle(async (symbol, timestamp) => {
     .select()
     .from(spot)
     .where(and(eq(spot.symbol, symbol), lte(spot.timestamp, timestamp)))
-    .orderBy(spot.timestamp, "desc")
+    .orderBy(desc(spot.timestamp))
     .limit(1)
     .execute();
 
@@ -288,7 +288,7 @@ export const getRealizedVolatility = handle(async (poolId, timestamp) => {
     .where(
       and(eq(volatility.pool_id, poolId), lte(volatility.timestamp, timestamp))
     )
-    .orderBy(volatility.timestamp, "desc")
+    .orderBy(desc(volatility.timestamp))
     .limit(1)
     .execute();
 

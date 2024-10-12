@@ -1,11 +1,16 @@
 import fs from "fs";
+import path from "path";
 import { program } from "commander";
 import { parse, format } from "fast-csv"; // Replaced csv-parser and csv-writer with fast-csv
 import { simulatePosition } from "#src/simulate.js";
 import db from "#src/database.js";
 import { trades, volatility } from "#src/schema.js";
 import { eq, and, gte } from "drizzle-orm";
-import { checkLiquidityIntegrity, getPoolById } from "#src/db-utils.js";
+import {
+  checkLiquidityIntegrity,
+  getPoolById,
+  getPoolMetadata,
+} from "#src/db-utils.js";
 import { fetchData } from "#src/fetcher.js";
 import CONFIG from "#src/config.js";
 import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
@@ -142,31 +147,47 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 }
 
 // Writing CSV output using fast-csv
-async function writeOutputCSV(results, outputFile) {
-  const csvStream = format({ headers: true });
-  const writableStream = fs.createWriteStream(outputFile);
+async function writeOutputCSV(results, outputDir) {
+  if (!fs.existsSync(outputDir)) {
+    fs.mkdirSync(outputDir, { recursive: true });
+  }
 
-  csvStream.pipe(writableStream);
+  for (const result of results) {
+    const { strategyName, poolType, poolAddress, positions } = result;
+    const pool = await getPoolMetadata(poolType, poolAddress);
+    const token0 = pool.token0Symbol;
+    const token1 = pool.token1Symbol;
+    
+    let increment = 1;
+    let fileName;
+    let filePath;
+    
+    do {
+      fileName = `${strategyName}_${token0}${token1}_${pool.id}_${poolType}_${increment}.csv`;
+      filePath = path.join(outputDir, fileName);
+      increment++;
+    } while (fs.existsSync(filePath));
 
-  results
-    .flatMap((result) =>
-      result.positions.map((position) => ({
-        strategyName: result.strategyName,
-        poolType: result.poolType,
-        poolAddress: result.poolAddress,
+    const csvStream = format({ headers: true });
+    const writableStream = fs.createWriteStream(filePath);
+
+    csvStream.pipe(writableStream);
+
+    positions.forEach((position) => {
+      csvStream.write({
         openTimestamp: new Date(position.openTimestamp).toISOString(),
         closeTimestamp: new Date(position.closeTimestamp).toISOString(),
         openPrice: position.openPrice,
         targetUptickPrice: position.targetUptickPrice,
         targetDowntickPrice: position.targetDowntickPrice,
         pnlPercent: position.pnlPercent,
-      }))
-    )
-    .forEach((record) => csvStream.write(record));
+      });
+    });
 
-  csvStream.end();
+    csvStream.end();
 
-  console.log(`Results written to ${outputFile}`);
+    console.log(`Results written to ${filePath}`);
+  }
 }
 
 async function main(opts) {
@@ -221,7 +242,7 @@ async function main(opts) {
     }
   }
 
-  // Write results to output CSV using fast-csv
+  // Write results to output CSVs using fast-csv
   await writeOutputCSV(results, opts.output);
 
   // Log summary statistics
@@ -237,11 +258,11 @@ async function main(opts) {
 
 program
   .description(
-    "Execute a strategy based on pools from the CSV file in the format of (poolType,poolAddress,startDate,endDate), and write output CSV with position history."
+    "Execute a strategy based on pools from the CSV file in the format of (poolType,poolAddress,startDate,endDate), and write output CSVs with position history."
   )
   .requiredOption("-i, --input <inputCSV>", "input CSV filename")
   .requiredOption("-s, --strategy <strategyJSON>", "strategy JSON filename")
-  .requiredOption("-o, --output <outputCSV>", "output CSV filename")
+  .option("-o, --output <outputDir>", "output directory", "output/")
   .option("-n, --no-checks", "disable data integrity check & autofetching")
   .action(main);
 

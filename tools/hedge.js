@@ -1,83 +1,47 @@
 import fs from "fs";
+import { parse } from "fast-csv";
 import { program } from "commander";
-import { parse, format } from "fast-csv";
-import {
-  getFirstSpotPrice,
-  getRealizedVolatility,
-  getPoolMetadata,
-} from "#src/db-utils.js";
+import { getFirstSpotPrice } from "../src/db-utils.js";
 
-// Black-Scholes Option Pricing Model
-function blackScholes(S, K, T, r, sigma, type) {
-  const d1 =
-    (Math.log(S / K) + (r + sigma ** 2 / 2) * T) / (sigma * Math.sqrt(T));
-  const d2 = d1 - sigma * Math.sqrt(T);
+async function calculateMaxTheta(row) {
+  const symbol = row.poolType === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
 
-  if (type === "call") {
-    return S * cdf(d1) - K * Math.exp(-r * T) * cdf(d2);
-  } else {
-    return K * Math.exp(-r * T) * cdf(-d2) - S * cdf(-d1);
-  }
-}
-
-// Cumulative distribution function for standard normal
-function cdf(x) {
-  const t = 1 / (1 + 0.2316419 * Math.abs(x));
-  const d = 0.3989423 * Math.exp((-x * x) / 2);
-  let prob =
-    d *
-    t *
-    (0.3193815 +
-      t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
-  if (x > 0) prob = 1 - prob;
-  return prob;
-}
-
-async function calculateStraddle(row, strategy) {
-  debugger;
-  const pool = await getPoolMetadata(row.poolType, row.poolAddress);
-  if (!pool) {
-    return null;
-  }
-
-  const symbol = pool.type.includes("ETH") ? "ETHUSDT" : "BNBUSDT";
-  const openTimestamp = new Date(row.openTimestamp).getTime();
-  const spotPrice = await getFirstSpotPrice(symbol, openTimestamp);
-  const realizedVolatility = await getRealizedVolatility(
-    pool.id,
-    openTimestamp
+  // Fetch spot price at the time of opening the position
+  const spotPrice = await getFirstSpotPrice(
+    symbol,
+    new Date(row.openTimestamp).getTime()
   );
 
-  if (!spotPrice || !realizedVolatility) {
-    return null;
+  if (!spotPrice) {
+    throw new Error(
+      `No spot price found for ${symbol} at ${row.openTimestamp}`
+    );
   }
 
-  const T = parseFloat(strategy.straddleDaysToExpiry) / 365; // Time to expiry in years
-  const r = parseFloat(strategy.riskFreeRate); // Risk-free rate
-  const sigma = realizedVolatility / 100; // Convert percentage to decimal
+  // Calculate the loss in USD based on PnL percent
+  const loss = row.pnlPercent;
 
-  if (spotPrice <= 0 || T <= 0 || r < 0 || sigma <= 0) {
-    return null;
-  }
+  // Assume delta is 0.5 for a typical at-the-money put option
+  const delta = 0.5;
 
-  const callPrice = blackScholes(spotPrice, spotPrice, T, r, sigma, "call");
-  const putPrice = blackScholes(spotPrice, spotPrice, T, r, sigma, "put");
-  const straddlePrice = callPrice + putPrice;
+  // Calculate the premium (amount required to hedge the loss)
+  const premium = loss / delta;
 
-  if (isNaN(callPrice) || isNaN(putPrice) || isNaN(straddlePrice)) {
-    return null;
-  }
+  // Calculate the number of days the position was open
+  const openDate = new Date(row.openTimestamp);
+  const closeDate = new Date(row.closeTimestamp);
+  const daysOpen = (closeDate - openDate) / (1000 * 60 * 60 * 24);
+
+  // Calculate the minimum theta required
+  const maxThetaForBreakeven = premium / daysOpen;
 
   return {
-    symbol,
+    maxThetaForBreakeven,
     spotPrice,
-    callPrice,
-    putPrice,
-    straddlePrice,
   };
 }
 
-async function processCSV(inputFile, outputFile, strategy) {
+async function processCSV(inputFile, outputFile) {
   const rows = await new Promise((resolve, reject) => {
     const rowsCSV = [];
     fs.createReadStream(inputFile)
@@ -89,44 +53,47 @@ async function processCSV(inputFile, outputFile, strategy) {
       .on("end", () => resolve(rowsCSV));
   });
 
-  const results = [];
-  for (const row of rows) {
-    const straddleResult = await calculateStraddle(row, strategy);
-    if (straddleResult) {
-      results.push({ ...row, ...straddleResult });
-    }
-  }
+  const results = await Promise.all(
+    rows.map(async (row) => ({
+      ...row,
+      ...(await calculateMaxTheta(row)),
+    }))
+  );
 
-  await new Promise((resolve, reject) => {
-    const csvStream = format({ headers: true });
-    const writableStream = fs.createWriteStream(outputFile);
+  console.log("Processing complete. Results summary:");
+  console.log(`Total positions: ${results.length}`);
+  console.log(
+    `Average max theta for breakeven: ${(
+      results.reduce((sum, r) => sum + r.maxThetaForBreakeven, 0) /
+      results.length
+    ).toFixed(6)}`
+  );
+  console.log(
+    `Average spot price: ${(
+      results.reduce((sum, r) => sum + r.spotPrice, 0) / results.length
+    ).toFixed(6)}`
+  );
 
-    csvStream.pipe(writableStream);
-    results.forEach((record) => csvStream.write(record));
-    csvStream.end();
+  // Write results to output file
+  const csvContent = [
+    Object.keys(results[0]).join(","),
+    ...results.map((r) => Object.values(r).join(",")),
+  ].join("\n");
 
-    writableStream.on("finish", resolve);
-    writableStream.on("error", reject);
-  });
+  fs.writeFileSync(outputFile, csvContent);
 }
 
 async function main(opts) {
-  const strategyJSON = JSON.parse(fs.readFileSync(opts.strategy, "utf8"));
-  const strategy = strategyJSON[0]; // Assuming we're using the first strategy
-
-  await processCSV(opts.input, opts.output, strategy);
+  await processCSV(opts.input, opts.output);
   console.log("Output written to", opts.output);
 }
 
 program
-  .description(
-    "Calculate straddle option prices for positions from strategy.js output"
-  )
+  .description("Calculate maximum theta for zero PnL from strategy.js output")
   .requiredOption(
     "-i, --input <inputCSV>",
     "input CSV filename (output from strategy.js)"
   )
-  .requiredOption("-s, --strategy <strategyJSON>", "strategy JSON filename")
   .requiredOption("-o, --output <outputCSV>", "output CSV filename")
   .action(main);
 

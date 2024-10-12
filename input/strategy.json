@@ -9,7 +9,7 @@
       "uptickPercent": 0.2,
       "downtickPercent": 0.3
     },
-    "straddleDaysToExpiry": 1,
+    "daysToExpiry": 1,
     "riskFreeRate": 0.01
   }
 ]
