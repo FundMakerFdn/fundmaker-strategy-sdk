@@ -174,6 +174,28 @@ export async function fetchAndSaveSpotData(interval, startDate, endDate) {
     await saveToDatabase(data, symbol, interval);
   }
   console.log("Data fetching and saving completed");
+
+  async function saveToDatabase(data, symbol, interval) {
+    const rows = data.map((item) => ({
+      symbol,
+      interval,
+      timestamp: parseInt(item[0]),
+      open: parseFloat(item[1]),
+      high: parseFloat(item[2]),
+      low: parseFloat(item[3]),
+      close: parseFloat(item[4]),
+      volume: parseFloat(item[5]),
+    }));
+
+    if (rows.length > 0) {
+      await batchInsert(db, spot, rows);
+      console.log(
+        `Saved ${rows.length} records for ${symbol} (${interval}) to the database`
+      );
+    } else {
+      console.log(`No valid records to save for ${symbol} (${interval})`);
+    }
+  }
 }
 
 function formatDate(timestamp) {
@@ -216,22 +238,4 @@ async function scrapeData(symbol, interval, startDate, endDate) {
   }
 
   return allData;
-}
-
-async function saveToDatabase(data, symbol, interval) {
-  const rows = data.map((item) => ({
-    symbol,
-    interval,
-    timestamp: item[0],
-    open: parseFloat(item[1]),
-    high: parseFloat(item[2]),
-    low: parseFloat(item[3]),
-    close: parseFloat(item[4]),
-    volume: parseFloat(item[5]),
-  }));
-
-  await batchInsert(db, spot, rows);
-  console.log(
-    `Saved ${rows.length} records for ${symbol} (${interval}) to the database`
-  );
 }
