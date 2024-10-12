@@ -153,17 +153,15 @@ Options:
   -h, --help                 display help for command
 ```
 
-This command fetches historical spot price data for BTCUSDT, ETHUSDT, and BNBUSDT pairs from the Binance API. The data is then saved to the database for further analysis or use in strategies.
+This command fetches historical spot price data for BTCUSDT, ETHUSDT, and BNBUSDT pairs from the Binance API. The data is then saved to the database.
 
 ### Usage example
 
-Fetch hourly data for the last 30 days:
+Fetch hourly data for 2024-09-12 to 2024-10-12:
 
 ```
-yarn fetch-spot -i 1h -s 2023-09-12 -e 2023-10-12
+yarn fetch-spot -i 1h -s 2024-09-12 -e 2024-10-12
 ```
-
-This will fetch hourly data for BTCUSDT, ETHUSDT, and BNBUSDT pairs from September 12, 2023, to October 12, 2023, and save it to the database.
 
 ## yarn print-pools
 
