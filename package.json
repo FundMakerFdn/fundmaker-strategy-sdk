@@ -10,7 +10,8 @@
     "pool-finder": "node tools/pool-finder.js",
     "strategy": "node tools/strategy.js",
     "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate"
+    "migrate": "drizzle-kit migrate",
+    "stats": "node tools/stats.js"
   },
   "keywords": [],
   "author": "FundMaker",
