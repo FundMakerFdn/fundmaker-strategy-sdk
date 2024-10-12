@@ -4,7 +4,32 @@ import {
   text,
   uniqueIndex,
   index,
+  real,
 } from "drizzle-orm/sqlite-core";
+
+export const spot = sqliteTable(
+  "spot",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    symbol: text("symbol").notNull(),
+    interval: text("interval").notNull(),
+    timestamp: integer("timestamp").notNull(),
+    open: real("open").notNull(),
+    high: real("high").notNull(),
+    low: real("low").notNull(),
+    close: real("close").notNull(),
+    volume: real("volume").notNull(),
+  },
+  (table) => ({
+    symbolIdx: index("spot_symbol_idx").on(table.symbol),
+    timestampIdx: index("spot_timestamp_idx").on(table.timestamp),
+    intervalIdx: index("spot_interval_idx").on(table.interval),
+    uniqueSymbolTimestamp: uniqueIndex("spot_symbol_timestamp_unique").on(
+      table.symbol,
+      table.timestamp
+    ),
+  })
+);
 
 export const pools = sqliteTable(
   "pools",

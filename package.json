@@ -11,7 +11,8 @@
     "strategy": "node tools/strategy.js",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
-    "stats": "node tools/stats.js"
+    "stats": "node tools/stats.js",
+    "fetch-spot": "node tools/fetch-spot.js"
   },
   "keywords": [],
   "author": "FundMaker",

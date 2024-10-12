@@ -26,6 +26,27 @@ function parseCSV(filePath) {
       .on("end", () => resolve(data))
       .on("error", (error) => reject(error));
   });
+
+  export const spotPrices = sqliteTable(
+    "spot_prices",
+    {
+      id: integer("id").primaryKey({ autoIncrement: true }),
+      symbol: text("symbol").notNull(),
+      timestamp: integer("timestamp").notNull(),
+      open: real("open").notNull(),
+      high: real("high").notNull(),
+      low: real("low").notNull(),
+      close: real("close").notNull(),
+      volume: real("volume").notNull(),
+    },
+    (table) => ({
+      symbolTimestampIdx: uniqueIndex("spot_prices_symbol_timestamp_idx").on(
+        table.symbol,
+        table.timestamp
+      ),
+      timestampIdx: index("spot_prices_timestamp_idx").on(table.timestamp),
+    })
+  );
 }
 
 function filterDataByDateRange(data, startDate, endDate) {
