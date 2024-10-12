@@ -1,6 +1,6 @@
 [
   {
-    "strategyName": "ETHUSDT_Thena",
+    "strategyName": "SuperStrat",
     "hoursCheckOpen": [11, 21],
     "volatilityThreshold": 1,
     "hoursCheckClose": [10],
