@@ -137,6 +137,34 @@ When there are multiple pools found, they are ordered by TVL (Total Value Locked
 
 5. List all pools ranked by TVL: `yarn pool-finder _ _`
 
+## `yarn fetch-spot`
+
+_Alias for `node tools/fetch-spot.js`_
+
+Fetch spot price data from Binance API and save it to the database.
+
+```
+Usage: fetch-spot [options]
+
+Options:
+  -i, --interval <interval>  Interval (e.g., 15m, 1h, 1d) (default: "1h")
+  -s, --start-date <date>    Start date (YYYY-MM-DD)
+  -e, --end-date <date>      End date (YYYY-MM-DD)
+  -h, --help                 display help for command
+```
+
+This command fetches historical spot price data for BTCUSDT, ETHUSDT, and BNBUSDT pairs from the Binance API. The data is then saved to the database for further analysis or use in strategies.
+
+### Usage example
+
+Fetch hourly data for the last 30 days:
+
+```
+yarn fetch-spot -i 1h -s 2023-09-12 -e 2023-10-12
+```
+
+This will fetch hourly data for BTCUSDT, ETHUSDT, and BNBUSDT pairs from September 12, 2023, to October 12, 2023, and save it to the database.
+
 ## yarn print-pools
 
 _Alias for `node tools/pools-csv.js -p`_
