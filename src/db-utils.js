@@ -1,5 +1,12 @@
 import db from "./database.js";
-import { pools, trades, liquidity, fee_tiers } from "./schema.js";
+import {
+  pools,
+  trades,
+  liquidity,
+  fee_tiers,
+  spot,
+  volatility,
+} from "./schema.js";
 import { sql, and, eq, lte, between, gte, count } from "drizzle-orm";
 import { handle } from "./misc-utils.js";
 import CONFIG from "./config.js";
@@ -261,3 +268,29 @@ export const getPoolById = handle(async (poolId) => {
     .limit(1);
   return rows[0];
 }, "getting pool by id");
+
+export const getFirstSpotPrice = handle(async (symbol, timestamp) => {
+  const result = await db
+    .select()
+    .from(spot)
+    .where(and(eq(spot.symbol, symbol), lte(spot.timestamp, timestamp)))
+    .orderBy(spot.timestamp, "desc")
+    .limit(1)
+    .execute();
+
+  return result.length > 0 ? result[0].close : null;
+}, "getting first spot price");
+
+export const getRealizedVolatility = handle(async (poolId, timestamp) => {
+  const result = await db
+    .select()
+    .from(volatility)
+    .where(
+      and(eq(volatility.pool_id, poolId), lte(volatility.timestamp, timestamp))
+    )
+    .orderBy(volatility.timestamp, "desc")
+    .limit(1)
+    .execute();
+
+  return result.length > 0 ? result[0].realizedVolatility : null;
+}, "getting realized volatility");

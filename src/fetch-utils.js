@@ -1,6 +1,6 @@
 import CONFIG from "#src/config.js";
 import db from "#src/database.js";
-import { pools, trades, liquidity, fee_tiers } from "#src/schema.js";
+import { pools, trades, liquidity, fee_tiers, spot } from "#src/schema.js";
 import {
   queryPoolMetadata,
   queryPoolTrades,
@@ -165,5 +165,73 @@ export async function fetchFeeTiers(pool, startDate, endDate) {
   saveFeeTiersToDatabase(feeTiersData, pool.id);
   console.log(
     `Finished fetching feeTiers for ${startDate.toISOString()} to ${endDate.toISOString()}`
+  );
+}
+
+export async function fetchAndSaveSpotData(interval, startDate, endDate) {
+  for (const symbol of CONFIG.SPOT_SYMBOLS) {
+    const data = await scrapeData(symbol, interval, startDate, endDate);
+    await saveToDatabase(data, symbol, interval);
+  }
+  console.log("Data fetching and saving completed");
+}
+
+function formatDate(timestamp) {
+  return new Date(timestamp).toISOString();
+}
+
+async function fetchData(symbol, interval, startTime, endTime) {
+  const url = `${CONFIG.SPOT_API_URL}?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${CONFIG.SPOT_BATCH_SIZE}`;
+  const response = await fetch(url);
+  const data = await response.json();
+  return data;
+}
+
+async function scrapeData(symbol, interval, startDate, endDate) {
+  let allData = [];
+  let currentStartTime = new Date(startDate).getTime();
+  const endTime = new Date(endDate).getTime();
+
+  while (currentStartTime < endTime) {
+    try {
+      const data = await fetchData(symbol, interval, currentStartTime, endTime);
+
+      if (data.length === 0) {
+        break;
+      } else {
+        allData = allData.concat(data);
+        currentStartTime = data[data.length - 1][0] + 1;
+        console.log(
+          `Fetched ${
+            data.length
+          } records for ${symbol}, new startTime: ${formatDate(
+            currentStartTime
+          )}, total: ${allData.length}`
+        );
+      }
+    } catch (error) {
+      console.error(`Error fetching data for ${symbol}:`, error);
+      break;
+    }
+  }
+
+  return allData;
+}
+
+async function saveToDatabase(data, symbol, interval) {
+  const rows = data.map((item) => ({
+    symbol,
+    interval,
+    timestamp: item[0],
+    open: parseFloat(item[1]),
+    high: parseFloat(item[2]),
+    low: parseFloat(item[3]),
+    close: parseFloat(item[4]),
+    volume: parseFloat(item[5]),
+  }));
+
+  await batchInsert(db, spot, rows);
+  console.log(
+    `Saved ${rows.length} records for ${symbol} (${interval}) to the database`
   );
 }
