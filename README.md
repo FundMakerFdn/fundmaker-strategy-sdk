@@ -14,6 +14,7 @@ yarn migrate   # create the local db
 Next, you can edit `.env` and `src/config.js` to set the settings you need.
 
 ## .env example
+
 ```
 SUBGRAPH_API_KEY="...your 32-symbol API key..."
 ```
@@ -47,7 +48,7 @@ Let's assume we 2 input files: `input/pools.csv`, `input/strategy.json`, which l
 
 ```
 poolType,poolAddress,startDate,endDate
-"uniswapv3","0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640","2024-09-01","2024-09-30"
+"UniswapV3_ETH","0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640","2024-09-01","2024-09-30"
 ```
 
 Notice that `startDate` defaults to the creation date of the pool, `endDate` defaults to now. You can write the data in any format supported by JavaScripts' `new Date()` constructor.
@@ -84,7 +85,7 @@ _Alias for `node tools/pool-finder.js`_
 
 Find pool contract address by pair token symbols' names.
 
-Please note that `token0` and  `token1` order matters.
+Please note that `token0` and `token1` order matters.
 
 ```
 Usage: pool-finder [options] <token0> <token1> [feeTier]
@@ -97,13 +98,14 @@ Arguments:
   feeTier                pool fee tier
 
 Options:
-  -t, --type <poolType>  pool type - uniswapv3 | thena (default: "uniswapv3")
+  -t, --type <poolType>  pool type - UniswapV3_ETH | Thena_BSC (default: "UniswapV3_ETH")
   -h, --help             display help for command
 ```
 
 ### Usage examples
 
 1. Find a specific pool: `yarn pool-finder usdc weth 500`. Output:
+
 ```
 Searching...
 Search results:
@@ -116,6 +118,7 @@ Fee tier: 500 (0.0500000%)
 2. List all available fee tiers for the pair: `yarn pool-finder usdc weth`
 
 3. Find all pools with USDC as token1: `yarn pool-finder _ usdc`. Output:
+
 ```
 [...]
 
@@ -130,7 +133,7 @@ Fee tier: 3000 (0.300000%)
 
 When there are multiple pools found, they are ordered by TVL (Total Value Locked), which is read from `totalValueLockedUSD` value returned by The Graph API.
 
-4. Use Thena instead of the default (UniswapV3): `yarn pool-finder -t thena _ wbnb`
+4. Use Thena instead of the default (UniswapV3): `yarn pool-finder -t Thena_BSC _ wbnb`
 
 5. List all pools ranked by TVL: `yarn pool-finder _ _`
 

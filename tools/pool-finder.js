@@ -41,7 +41,11 @@ async function findPool(token0, token1, feeTier) {
 
 program
   .description("Find the pool address by token symbols, ranked by TVL")
-  .option("-t, --type <poolType>", "pool type - uniswapv3 | thena", "uniswapv3")
+  .option(
+    "-t, --type <poolType>",
+    "pool type - UniswapV3_ETH | Thena_BSC",
+    "UniswapV3_ETH"
+  )
   .argument("<token0>", "token 0 symbol, _ means any")
   .argument("<token1>", "token 1 symbol, _ means any")
   .argument("[feeTier]", "pool fee tier")
