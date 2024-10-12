@@ -2,10 +2,9 @@ import { program } from "commander";
 import db from "#src/database.js";
 import { spot } from "#src/schema.js";
 import { batchInsert } from "#src/db-utils.js";
+import CONFIG from "#src/config.js";
 
-const API_URL = "https://api.binance.com/api/v3/klines";
-const SYMBOLS = ["BTCUSDT", "ETHUSDT", "BNBUSDT"];
-const LIMIT = 1000;
+const { SPOT_API_URL, SPOT_SYMBOLS, SPOT_BATCH_SIZE } = CONFIG;
 
 function formatDate(timestamp) {
   return new Date(timestamp).toISOString();
@@ -25,7 +24,7 @@ if (!options.startDate || !options.endDate) {
 }
 
 async function fetchData(symbol, interval, startTime, endTime) {
-  const url = `${API_URL}?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${LIMIT}`;
+  const url = `${SPOT_API_URL}?symbol=${symbol}&interval=${interval}&startTime=${startTime}&endTime=${endTime}&limit=${SPOT_BATCH_SIZE}`;
   const response = await fetch(url);
   const data = await response.json();
   return data;
@@ -75,7 +74,7 @@ async function saveToDatabase(data, symbol, interval) {
 }
 
 async function main() {
-  for (const symbol of SYMBOLS) {
+  for (const symbol of SPOT_SYMBOLS) {
     const data = await scrapeData(
       symbol,
       options.interval,

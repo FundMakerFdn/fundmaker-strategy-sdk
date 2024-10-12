@@ -28,6 +28,11 @@ const CONFIG = {
   DEFAULT_POS_USD: 100,
 
   VERBOSE: false,
+
+  // Constants for fetch-spot
+  SPOT_API_URL: "https://api.binance.com/api/v3/klines",
+  SPOT_SYMBOLS: ["BTCUSDT", "ETHUSDT", "BNBUSDT"],
+  SPOT_BATCH_SIZE: 1000,
 };
 
 /*CONFIG.position = {
