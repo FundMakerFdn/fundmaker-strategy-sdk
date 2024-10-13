@@ -35,6 +35,8 @@ const CONFIG = {
   SPOT_BATCH_SIZE: 1000,
   IV_API_URL: "https://rest-v1.volmex.finance/public/iv/history",
   IV_SYMBOLS: ["BVIV", "EVIV"],
+
+  dbFilename: "data.db",
 };
 
 /*CONFIG.position = {
