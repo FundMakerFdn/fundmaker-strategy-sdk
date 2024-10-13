@@ -40,7 +40,7 @@ function findMaxTheta(pnlPercent, dte) {
   return maxThetaPerDay;
 }
 
-function processData(data, strategy) {
+function processData(data) {
   const results = [];
 
   for (const { file, records } of data) {
