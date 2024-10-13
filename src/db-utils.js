@@ -5,6 +5,7 @@ import {
   liquidity,
   fee_tiers,
   spot,
+  iv_hist,
   volatility,
 } from "./schema.js";
 import { sql, and, eq, lte, between, gte, count, desc } from "drizzle-orm";
@@ -280,6 +281,18 @@ export const getFirstSpotPrice = handle(async (symbol, timestamp) => {
 
   return result.length > 0 ? result[0].close : null;
 }, "getting first spot price");
+
+export const getHistIV = handle(async (symbol, timestamp) => {
+  const result = await db
+    .select()
+    .from(iv_hist)
+    .where(and(eq(iv_hist.symbol, symbol), lte(iv_hist.timestamp, timestamp)))
+    .orderBy(desc(iv_hist.timestamp))
+    .limit(1)
+    .execute();
+
+  return result.length > 0 ? result[0].close : null;
+}, "getting historical implied volatility");
 
 export const getRealizedVolatility = handle(async (poolId, timestamp) => {
   const result = await db

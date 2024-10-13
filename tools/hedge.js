@@ -1,152 +1,177 @@
 import fs from "fs";
 import path from "path";
-import { parse } from "fast-csv";
+import { parse } from "csv-parse/sync";
 import { program } from "commander";
-import { getFirstSpotPrice } from "../src/db-utils.js";
+import db from "../src/database.js";
+import { getFirstSpotPrice, getHistIV } from "../src/db-utils.js";
 
-async function calculateProfitability(row, theta, maxOptionPrice) {
-  const symbol = row.poolType === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
-  const spotPrice = await getFirstSpotPrice(
-    symbol,
-    new Date(row.openTimestamp).getTime()
-  );
-  if (!spotPrice) {
+const AMOUNT = 100;
+
+async function getVolatilityAndSpotPrice(poolType, poolId, timestamp) {
+  const symbol = poolType === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
+  const volatilitySymbol = "EVIV";
+
+  const spotPrice = await getFirstSpotPrice(symbol, timestamp);
+  const volatility = await getHistIV(volatilitySymbol, timestamp);
+
+  if (!spotPrice || !volatility) {
     throw new Error(
-      `No spot price found for ${symbol} at ${row.openTimestamp}`
+      "Unable to fetch spot price or historical implied volatility from the database"
     );
   }
 
-  const openDate = new Date(row.openTimestamp);
-  const closeDate = new Date(row.closeTimestamp);
-  const daysOpen = (closeDate - openDate) / (1000 * 60 * 60 * 24);
-
-  // Calculate LP PnL (already in percentage)
-  const lpPnl = parseFloat(row.pnlPercent);
-
-  // Calculate option PnL based on theta (put option)
-  const optionPnl = Math.min(
-    ((theta * spotPrice * daysOpen) / spotPrice) * 100,
-    maxOptionPrice
-  );
-
-  // Calculate combined PnL (in percentage)
-  const combinedPnl = lpPnl + optionPnl;
-
-  return {
-    combinedPnl,
-    spotPrice,
-    daysOpen,
-    lpPnl,
-    optionPnl,
-    theta,
-  };
+  return { spotPrice, volatility: volatility / 100 };
 }
 
-async function processCSV(inputFile, maxOptionPrice) {
-  const rows = await new Promise((resolve, reject) => {
-    const rowsCSV = [];
-    fs.createReadStream(inputFile)
-      .pipe(parse({ headers: true }))
-      .on("data", (row) => {
-        rowsCSV.push(row);
-      })
-      .on("error", reject)
-      .on("end", () => resolve(rowsCSV));
-  });
+function calculateOptionPnL(
+  options,
+  volatilityChange,
+  timeElapsed,
+  underlyingChange
+) {
+  let totalPnL = 0;
 
-  const thetaValues = Array.from({ length: 1001 }, (_, i) => i / 10000); // 0 to 0.1 with 0.0001 step
-  let bestTheta = 0;
-  let bestTotalPnl = -Infinity;
+  for (const option of options) {
+    let optionPnL = 0;
 
-  console.log(`Processing ${inputFile}`);
+    // NVega PnL
+    optionPnL += option.nVega * volatilityChange * option.fixedNVega;
 
-  for (const theta of thetaValues) {
-    const results = await Promise.all(
-      rows.map((row) => calculateProfitability(row, theta, maxOptionPrice))
-    );
-    const totalPnl = results.reduce(
-      (sum, result) => sum + result.combinedPnl,
-      0
-    );
+    // NTheta PnL
+    optionPnL += option.nTheta * timeElapsed * option.fixedNTheta;
 
-    if (totalPnl > bestTotalPnl) {
-      bestTotalPnl = totalPnl;
-      bestTheta = theta;
+    // NDelta PnL (we'll calculate this in determineMaxNDelta)
+    // optionPnL += option.nDelta * underlyingChange;
+
+    totalPnL += optionPnL;
+  }
+
+  return totalPnL;
+}
+
+function determineMaxNDelta(options, targetPnL) {
+  let low = 0;
+  let high = 10; // Increased the upper bound to account for potential higher deltas
+  const epsilon = 0.0001;
+
+  while (high - low > epsilon) {
+    const mid = (low + high) / 2;
+    let pnl = calculateOptionPnL(options, 0, 0, 0);
+
+    // Add NDelta PnL
+    for (const option of options) {
+      pnl += mid * 0.01; // Assuming 1% underlying change for simplicity
     }
 
-    // Log progress every 100 iterations
-    if (theta * 10000 % 100 === 0) {
-      console.log(`Theta: ${theta.toFixed(4)}, Total PnL: ${totalPnl.toFixed(6)}`);
+    if (pnl < targetPnL) {
+      low = mid;
+    } else {
+      high = mid;
     }
   }
 
-  console.log(`Best theta found: ${bestTheta.toFixed(4)}, Total PnL: ${bestTotalPnl.toFixed(6)}`);
-
-  // Calculate additional statistics for the best theta
-  const bestResults = await Promise.all(
-    rows.map((row) => calculateProfitability(row, bestTheta, maxOptionPrice))
-  );
-  const averageLpPnl = bestResults.reduce((sum, result) => sum + result.lpPnl, 0) / rows.length;
-  const averageOptionPnl = bestResults.reduce((sum, result) => sum + result.optionPnl, 0) / rows.length;
-  const averageDaysOpen = bestResults.reduce((sum, result) => sum + result.daysOpen, 0) / rows.length;
-
-  console.log(`Average LP PnL: ${averageLpPnl.toFixed(6)}%`);
-  console.log(`Average Option PnL: ${averageOptionPnl.toFixed(6)}%`);
-  console.log(`Average Days Open: ${averageDaysOpen.toFixed(2)}`);
-
-  return {
-    inputFile,
-    bestTheta,
-    totalPnl: bestTotalPnl,
-    averagePnl: bestTotalPnl / rows.length,
-    totalPositions: rows.length,
-    averageLpPnl,
-    averageOptionPnl,
-    averageDaysOpen,
-  };
+  return (low + high) / 2;
 }
 
-async function processDirectory(inputDir, outputFile, maxOptionPrice) {
+function readCSVFiles(directoryPath) {
   const files = fs
-    .readdirSync(inputDir)
+    .readdirSync(directoryPath)
     .filter((file) => file.endsWith(".csv"));
-  const results = await Promise.all(
-    files.map((file) => processCSV(path.join(inputDir, file), maxOptionPrice))
-  );
+  const allData = [];
 
-  const csvContent = [
-    "inputFile,bestTheta,totalPnl,averagePnl,totalPositions,averageLpPnl,averageOptionPnl,averageDaysOpen",
-    ...results.map(
-      (r) =>
-        `${r.inputFile},${r.bestTheta},${r.totalPnl.toFixed(6)},${r.averagePnl.toFixed(6)},${r.totalPositions},${r.averageLpPnl.toFixed(6)},${r.averageOptionPnl.toFixed(6)},${r.averageDaysOpen.toFixed(2)}`
-    ),
-  ].join("\n");
+  for (const file of files) {
+    const filePath = path.join(directoryPath, file);
+    const fileContent = fs.readFileSync(filePath, "utf-8");
+    const records = parse(fileContent, {
+      columns: true,
+      skip_empty_lines: true,
+    });
+    allData.push(...records);
+  }
 
-  fs.writeFileSync(outputFile, csvContent);
-
-  console.log("Processing complete. Results summary:");
-  console.log(`Total files processed: ${results.length}`);
-  console.log(`Output written to ${outputFile}`);
+  return allData;
 }
 
-async function main(opts) {
-  await processDirectory(opts.input, opts.output, opts.maxOptionPrice);
+async function simulateHedging(lpPositions, strategy) {
+  const results = [];
+
+  for (const position of lpPositions) {
+    const openTimestamp = new Date(position.openTimestamp).getTime();
+    const closeTimestamp = new Date(position.closeTimestamp).getTime();
+    const timeElapsed =
+      (closeTimestamp - openTimestamp) / (1000 * 60 * 60 * 24); // in days
+
+    const { spotPrice: openSpotPrice, volatility: openVolatility } =
+      await getVolatilityAndSpotPrice(
+        position.poolType,
+        position.poolId,
+        openTimestamp
+      );
+    const { spotPrice: closeSpotPrice, volatility: closeVolatility } =
+      await getVolatilityAndSpotPrice(
+        position.poolType,
+        position.poolId,
+        closeTimestamp
+      );
+
+    const volatilityChange = closeVolatility - openVolatility;
+    const underlyingChange = (closeSpotPrice - openSpotPrice) / openSpotPrice;
+
+    const maxNDelta = determineMaxNDelta(strategy.options, 0.0025); // 0.25% target PnL
+
+    const optionPnL = calculateOptionPnL(
+      strategy.options,
+      volatilityChange,
+      timeElapsed,
+      underlyingChange * maxNDelta
+    );
+    const lpPnL = (parseFloat(position.pnlPercent) / 100) * AMOUNT;
+    const totalPnL = lpPnL + optionPnL;
+
+    results.push({
+      position,
+      lpPnL,
+      optionPnL,
+      totalPnL,
+      maxNDelta,
+    });
+  }
+
+  return results;
+}
+
+async function main(directoryPath, strategyFilePath) {
+  const lpPositions = readCSVFiles(directoryPath);
+  const strategyContent = fs.readFileSync(strategyFilePath, 'utf-8');
+  const strategies = JSON.parse(strategyContent);
+  
+  for (const strategy of strategies) {
+    console.log(`Simulating strategy: ${strategy.strategyName}`);
+    const results = await simulateHedging(lpPositions, strategy);
+
+    for (const result of results) {
+      console.log(
+        `Position: ${result.position.openTimestamp} - ${result.position.closeTimestamp}`
+      );
+      console.log(`LP PnL: ${result.lpPnL.toFixed(4)}`);
+      console.log(`Option PnL: ${result.optionPnL.toFixed(4)}`);
+      console.log(`Total PnL: ${result.totalPnL.toFixed(4)}`);
+      console.log(`Max NDelta: ${result.maxNDelta.toFixed(4)}`);
+      console.log("---");
+    }
+  }
 }
 
 program
-  .description(
-    "Calculate best theta and profitability of hedging strategy for multiple CSV files"
-  )
-  .requiredOption(
-    "-i, --input <inputDir>",
-    "input directory containing CSV files"
-  )
-  .requiredOption("-o, --output <outputCSV>", "output CSV filename")
-  .requiredOption(
-    "-m, --max-option-price <price>",
-    "maximum option price as a percentage",
-    parseFloat
-  )
-  .action(main);
+  .description("CLI tool for options-based LP position hedging simulation")
+  .requiredOption("-d, --directory <path>", "Input directory path")
+  .requiredOption("-s, --strategy <path>", "Path to the strategy JSON file")
+  .action(async (options) => {
+    try {
+      await main(options.directory, options.strategy);
+    } catch (error) {
+      console.error("An error occurred:", error);
+    }
+  });
 
 program.parse(process.argv);

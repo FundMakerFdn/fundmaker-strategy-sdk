@@ -24,6 +24,7 @@
   "description": "",
   "dependencies": {
     "@json2csv/plainjs": "^7.0.6",
+    "adm-zip": "^0.5.16",
     "axios": "^1.7.7",
     "axios-retry": "^4.5.0",
     "better-sqlite3": "^11.3.0",
