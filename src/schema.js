@@ -121,3 +121,27 @@ export const volatility = sqliteTable(
     timestampIdx: index("volatility_timestamp_idx").on(table.timestamp),
   })
 );
+
+export const iv_hist = sqliteTable(
+  "iv_hist",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    symbol: text("symbol").notNull(),
+    resolution: text("resolution").notNull(),
+    timestamp: integer("timestamp").notNull(),
+    open: real("open").notNull(),
+    high: real("high").notNull(),
+    low: real("low").notNull(),
+    close: real("close").notNull(),
+  },
+  (table) => ({
+    symbolIdx: index("iv_hist_symbol_idx").on(table.symbol),
+    timestampIdx: index("iv_hist_timestamp_idx").on(table.timestamp),
+    resolutionIdx: index("iv_hist_resolution_idx").on(table.resolution),
+    uniqueSymbolTimestampResolution: uniqueIndex("iv_hist_symbol_timestamp_resolution_unique").on(
+      table.symbol,
+      table.timestamp,
+      table.resolution
+    ),
+  })
+);

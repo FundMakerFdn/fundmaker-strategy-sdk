@@ -33,6 +33,8 @@ const CONFIG = {
   SPOT_API_URL: "https://api.binance.com/api/v3/klines",
   SPOT_SYMBOLS: ["BTCUSDT", "ETHUSDT", "BNBUSDT"],
   SPOT_BATCH_SIZE: 1000,
+  IV_API_URL: "https://rest-v1.volmex.finance/public/iv/history",
+  IV_SYMBOLS: ["BVIV", "EVIV"],
 };
 
 /*CONFIG.position = {

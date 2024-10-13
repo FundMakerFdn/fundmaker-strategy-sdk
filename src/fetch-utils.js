@@ -1,6 +1,6 @@
 import CONFIG from "#src/config.js";
 import db from "#src/database.js";
-import { pools, trades, liquidity, fee_tiers, spot } from "#src/schema.js";
+import { pools, trades, liquidity, fee_tiers, spot, iv_hist } from "#src/schema.js";
 import {
   queryPoolMetadata,
   queryPoolTrades,
@@ -195,6 +195,43 @@ export async function fetchAndSaveSpotData(interval, startDate, endDate) {
     } else {
       console.log(`No valid records to save for ${symbol} (${interval})`);
     }
+  }
+}
+
+export async function fetchAndSaveIVData(symbol, resolution, fromDate, toDate) {
+  const from = Math.floor(new Date(fromDate).getTime() / 1000);
+  const to = Math.floor(new Date(toDate).getTime() / 1000);
+  
+  const url = `${CONFIG.IV_API_URL}?symbol=${symbol}&resolution=${resolution}&from=${from}&to=${to}`;
+  
+  try {
+    const response = await fetch(url);
+    const data = await response.json();
+    
+    if (data.s === "ok") {
+      const rows = data.t.map((timestamp, index) => ({
+        symbol,
+        resolution,
+        timestamp: timestamp * 1000, // Convert to milliseconds
+        open: data.o[index],
+        high: data.h[index],
+        low: data.l[index],
+        close: data.c[index],
+      }));
+
+      if (rows.length > 0) {
+        await batchInsert(db, iv_hist, rows);
+        console.log(
+          `Saved ${rows.length} IV records for ${symbol} (resolution: ${resolution}) to the database`
+        );
+      } else {
+        console.log(`No valid IV records to save for ${symbol} (resolution: ${resolution})`);
+      }
+    } else {
+      console.error(`Error fetching IV data: ${data.s}`);
+    }
+  } catch (error) {
+    console.error(`Error fetching or saving IV data:`, error);
   }
 }
 

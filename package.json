@@ -14,6 +14,7 @@
     "stats": "node tools/stats.js",
     "fetch-spot": "node tools/fetch-spot-bv.js",
     "fetch-spot-direct": "node tools/fetch-spot-direct.js",
+    "fetch-iv": "node tools/fetch-iv.js",
     "hedge": "node tools/hedge.js",
     "update": "node tools/update.js"
   },
@@ -34,7 +35,8 @@
     "decimal.js": "^10.4.3",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.33.0",
-    "fast-csv": "^5.0.1"
+    "fast-csv": "^5.0.1",
+    "ml-regression-simple-linear": "^3.0.1"
   },
   "devDependencies": {
     "drizzle-kit": "^0.24.2"

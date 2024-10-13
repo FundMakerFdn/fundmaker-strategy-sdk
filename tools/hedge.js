@@ -1,47 +1,48 @@
 import fs from "fs";
+import path from "path";
 import { parse } from "fast-csv";
 import { program } from "commander";
 import { getFirstSpotPrice } from "../src/db-utils.js";
 
-async function calculateMaxTheta(row) {
+async function calculateProfitability(row, theta, maxOptionPrice) {
   const symbol = row.poolType === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
-
-  // Fetch spot price at the time of opening the position
   const spotPrice = await getFirstSpotPrice(
     symbol,
     new Date(row.openTimestamp).getTime()
   );
-
   if (!spotPrice) {
     throw new Error(
       `No spot price found for ${symbol} at ${row.openTimestamp}`
     );
   }
 
-  // Calculate the loss in USD based on PnL percent
-  const loss = row.pnlPercent;
-
-  // Assume delta is 0.5 for a typical at-the-money put option
-  const delta = 0.5;
-
-  // Calculate the premium (amount required to hedge the loss)
-  const premium = loss / delta;
-
-  // Calculate the number of days the position was open
   const openDate = new Date(row.openTimestamp);
   const closeDate = new Date(row.closeTimestamp);
   const daysOpen = (closeDate - openDate) / (1000 * 60 * 60 * 24);
 
-  // Calculate the minimum theta required
-  const maxThetaForBreakeven = premium / daysOpen;
+  // Calculate LP PnL (already in percentage)
+  const lpPnl = parseFloat(row.pnlPercent);
+
+  // Calculate option PnL based on theta (put option)
+  const optionPnl = Math.min(
+    ((theta * spotPrice * daysOpen) / spotPrice) * 100,
+    maxOptionPrice
+  );
+
+  // Calculate combined PnL (in percentage)
+  const combinedPnl = lpPnl + optionPnl;
 
   return {
-    maxThetaForBreakeven,
+    combinedPnl,
     spotPrice,
+    daysOpen,
+    lpPnl,
+    optionPnl,
+    theta,
   };
 }
 
-async function processCSV(inputFile, outputFile) {
+async function processCSV(inputFile, maxOptionPrice) {
   const rows = await new Promise((resolve, reject) => {
     const rowsCSV = [];
     fs.createReadStream(inputFile)
@@ -53,48 +54,99 @@ async function processCSV(inputFile, outputFile) {
       .on("end", () => resolve(rowsCSV));
   });
 
+  const thetaValues = Array.from({ length: 1001 }, (_, i) => i / 10000); // 0 to 0.1 with 0.0001 step
+  let bestTheta = 0;
+  let bestTotalPnl = -Infinity;
+
+  console.log(`Processing ${inputFile}`);
+
+  for (const theta of thetaValues) {
+    const results = await Promise.all(
+      rows.map((row) => calculateProfitability(row, theta, maxOptionPrice))
+    );
+    const totalPnl = results.reduce(
+      (sum, result) => sum + result.combinedPnl,
+      0
+    );
+
+    if (totalPnl > bestTotalPnl) {
+      bestTotalPnl = totalPnl;
+      bestTheta = theta;
+    }
+
+    // Log progress every 100 iterations
+    if (theta * 10000 % 100 === 0) {
+      console.log(`Theta: ${theta.toFixed(4)}, Total PnL: ${totalPnl.toFixed(6)}`);
+    }
+  }
+
+  console.log(`Best theta found: ${bestTheta.toFixed(4)}, Total PnL: ${bestTotalPnl.toFixed(6)}`);
+
+  // Calculate additional statistics for the best theta
+  const bestResults = await Promise.all(
+    rows.map((row) => calculateProfitability(row, bestTheta, maxOptionPrice))
+  );
+  const averageLpPnl = bestResults.reduce((sum, result) => sum + result.lpPnl, 0) / rows.length;
+  const averageOptionPnl = bestResults.reduce((sum, result) => sum + result.optionPnl, 0) / rows.length;
+  const averageDaysOpen = bestResults.reduce((sum, result) => sum + result.daysOpen, 0) / rows.length;
+
+  console.log(`Average LP PnL: ${averageLpPnl.toFixed(6)}%`);
+  console.log(`Average Option PnL: ${averageOptionPnl.toFixed(6)}%`);
+  console.log(`Average Days Open: ${averageDaysOpen.toFixed(2)}`);
+
+  return {
+    inputFile,
+    bestTheta,
+    totalPnl: bestTotalPnl,
+    averagePnl: bestTotalPnl / rows.length,
+    totalPositions: rows.length,
+    averageLpPnl,
+    averageOptionPnl,
+    averageDaysOpen,
+  };
+}
+
+async function processDirectory(inputDir, outputFile, maxOptionPrice) {
+  const files = fs
+    .readdirSync(inputDir)
+    .filter((file) => file.endsWith(".csv"));
   const results = await Promise.all(
-    rows.map(async (row) => ({
-      ...row,
-      ...(await calculateMaxTheta(row)),
-    }))
+    files.map((file) => processCSV(path.join(inputDir, file), maxOptionPrice))
   );
 
-  console.log("Processing complete. Results summary:");
-  console.log(`Total positions: ${results.length}`);
-  console.log(
-    `Average max theta for breakeven: ${(
-      results.reduce((sum, r) => sum + r.maxThetaForBreakeven, 0) /
-      results.length
-    ).toFixed(6)}`
-  );
-  console.log(
-    `Average spot price: ${(
-      results.reduce((sum, r) => sum + r.spotPrice, 0) / results.length
-    ).toFixed(6)}`
-  );
-
-  // Write results to output file
   const csvContent = [
-    Object.keys(results[0]).join(","),
-    ...results.map((r) => Object.values(r).join(",")),
+    "inputFile,bestTheta,totalPnl,averagePnl,totalPositions,averageLpPnl,averageOptionPnl,averageDaysOpen",
+    ...results.map(
+      (r) =>
+        `${r.inputFile},${r.bestTheta},${r.totalPnl.toFixed(6)},${r.averagePnl.toFixed(6)},${r.totalPositions},${r.averageLpPnl.toFixed(6)},${r.averageOptionPnl.toFixed(6)},${r.averageDaysOpen.toFixed(2)}`
+    ),
   ].join("\n");
 
   fs.writeFileSync(outputFile, csvContent);
+
+  console.log("Processing complete. Results summary:");
+  console.log(`Total files processed: ${results.length}`);
+  console.log(`Output written to ${outputFile}`);
 }
 
 async function main(opts) {
-  await processCSV(opts.input, opts.output);
-  console.log("Output written to", opts.output);
+  await processDirectory(opts.input, opts.output, opts.maxOptionPrice);
 }
 
 program
-  .description("Calculate maximum theta for zero PnL from strategy.js output")
+  .description(
+    "Calculate best theta and profitability of hedging strategy for multiple CSV files"
+  )
   .requiredOption(
-    "-i, --input <inputCSV>",
-    "input CSV filename (output from strategy.js)"
+    "-i, --input <inputDir>",
+    "input directory containing CSV files"
   )
   .requiredOption("-o, --output <outputCSV>", "output CSV filename")
+  .requiredOption(
+    "-m, --max-option-price <price>",
+    "maximum option price as a percentage",
+    parseFloat
+  )
   .action(main);
 
 program.parse(process.argv);

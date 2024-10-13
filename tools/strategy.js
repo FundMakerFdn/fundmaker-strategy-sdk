@@ -1,7 +1,7 @@
 import fs from "fs";
 import path from "path";
 import { program } from "commander";
-import { parse, format } from "fast-csv"; // Replaced csv-parser and csv-writer with fast-csv
+import { parse, format } from "fast-csv";
 import { simulatePosition } from "#src/simulate.js";
 import db from "#src/database.js";
 import { trades, volatility } from "#src/schema.js";
@@ -157,11 +157,11 @@ async function writeOutputCSV(results, outputDir) {
     const pool = await getPoolMetadata(poolType, poolAddress);
     const token0 = pool.token0Symbol;
     const token1 = pool.token1Symbol;
-    
+
     let increment = 1;
     let fileName;
     let filePath;
-    
+
     do {
       fileName = `${strategyName}_${token0}${token1}_${pool.id}_${poolType}_${increment}.csv`;
       filePath = path.join(outputDir, fileName);
