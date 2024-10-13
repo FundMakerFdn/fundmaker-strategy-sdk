@@ -9,23 +9,9 @@
       "uptickPercent": 0.2,
       "downtickPercent": 0.3
     },
-    "options": [
-      {
-        "type": "call",
-        "strike": 1.02,
-        "nVega": 0.05,
-        "nTheta": -0.02,
-        "fixedNVega": 50,
-        "fixedNTheta": 50
-      },
-      {
-        "type": "put",
-        "strike": 0.98,
-        "nVega": 0.05,
-        "nTheta": -0.02,
-        "fixedNVega": 50,
-        "fixedNTheta": 50
-      }
-    ]
+    "options": {
+      "nVega": 0.05,
+      "nDelta": 0.1
+    }
   }
 ]
