@@ -28,11 +28,12 @@ rl.question(
   (answer) => {
     if (answer.toLowerCase() === "y") {
       console.log("Migrating database...");
+      runCommand("yarn generate");
       runCommand("yarn migrate");
     } else {
       console.log("Removing existing database...");
       try {
-        fs.unlinkSync("your_database_file.sqlite"); // Replace with your actual database file name
+        fs.unlinkSync("data.db"); // Replace with your actual database file name
       } catch (error) {
         console.log("No existing database found or error removing it.");
       }
