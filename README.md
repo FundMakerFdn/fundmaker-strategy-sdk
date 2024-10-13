@@ -139,7 +139,7 @@ When there are multiple pools found, they are ordered by TVL (Total Value Locked
 
 ## `yarn fetch-spot`
 
-_Alias for `node tools/fetch-spot.js`_
+_Alias for `node tools/fetch-spot-bv.js`_
 
 Fetch spot price data from Binance API and save it to the database.
 
@@ -161,6 +161,32 @@ Fetch hourly data for 2024-09-12 to 2024-10-12:
 
 ```
 yarn fetch-spot -i 1h -s 2024-09-12 -e 2024-10-12
+```
+
+## `yarn fetch-iv`
+
+_Alias for `node tools/fetch-iv.js`_
+
+Fetch implied volatility (IV) data and save it to the database.
+
+```
+Usage: fetch-iv [options]
+
+Options:
+  -r, --resolution <resolution>  Resolution (e.g., 60) (default: "60")
+  -f, --from <date>              From date (YYYY-MM-DD)
+  -t, --to <date>                To date (YYYY-MM-DD)
+  -h, --help                     display help for command
+```
+
+This command fetches historical implied volatility data for the symbols specified in `CONFIG.IV_SYMBOLS` from the data source. The data is then saved to the database.
+
+### Usage example
+
+Fetch hourly IV data for 2024-09-12 to 2024-10-12:
+
+```
+yarn fetch-iv -r 60 -f 2024-09-12 -t 2024-10-12
 ```
 
 ## yarn print-pools
