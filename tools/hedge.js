@@ -26,22 +26,26 @@ function calculateDTE(openTimestamp, closeTimestamp) {
   const openDate = new Date(openTimestamp);
   const closeDate = new Date(closeTimestamp);
   const timeDiff = closeDate.getTime() - openDate.getTime();
-  return Math.ceil(timeDiff / (1000 * 3600)) / 24;
+  return Math.ceil((timeDiff / (1000 * 3600 * 24)) * 10) / 10;
 }
 
-function findMaxTheta(pnlPercent, dte) {
-  // For a straddle strategy, we assume the maximum profit is achieved when the underlying
-  // asset price doesn't move (pnlPercent = 0)
+function findMaxTheta(pnlPercent, dte, nVega, nDelta) {
+  // For a straddle strategy, we buy both a call and a put option
   const maxProfit = Math.abs(pnlPercent);
 
-  // The maximum theta per day that still allows for profit
-  const maxThetaPerDay = maxProfit / dte;
+  // The maximum theta per day that still allows for profit, considering two options
+  let maxThetaPerDay = maxProfit / (dte * 2);
+
+  // Adjust maxThetaPerDay based on vega and delta
+  // maxThetaPerDay *= 1 + nVega * 0.05; // Example vega adjustment
+  // maxThetaPerDay *= 1 + nDelta * 0.1; // Example delta adjustment
 
   return maxThetaPerDay;
 }
 
-function processData(data) {
+function processData(data, strategy) {
   const results = [];
+  const { nVega, nDelta } = strategy.options;
 
   for (const { file, records } of data) {
     const fileResults = [];
@@ -50,12 +54,14 @@ function processData(data) {
       const pnlPercent = parseFloat(record.pnlPercent);
       const dte = calculateDTE(record.openTimestamp, record.closeTimestamp);
 
-      const maxTheta = findMaxTheta(pnlPercent, dte);
+      const maxTheta = findMaxTheta(pnlPercent, dte, nVega, nDelta);
 
       fileResults.push({
         ...record,
         dte,
         maxTheta,
+        // nVega,
+        // nDelta,
       });
     }
 
