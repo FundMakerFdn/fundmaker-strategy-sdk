@@ -1,17 +1,27 @@
 [
   {
-    "strategyName": "SuperStrat",
+    "strategyName": "ExampleStrat",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 1,
+    "volatilityThreshold": 10,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
       "uptickPercent": 0.2,
       "downtickPercent": 0.3
     },
-    "options": {
-      "nVega": 0.05,
-      "nDelta": 0.1
-    }
+    "options": [
+      {
+        "nVega": 0.05,
+        "nDelta": 0.1,
+        "optionType": "call",
+        "moneyness": "ATM"
+      },
+      {
+        "nVega": 0.05,
+        "nDelta": 0.1,
+        "optionType": "put",
+        "moneyness": "ATM"
+      }
+    ]
   }
 ]
