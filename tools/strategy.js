@@ -175,6 +175,8 @@ async function writeOutputCSV(results, outputDir) {
 
     positions.forEach((position) => {
       csvStream.write({
+        poolType: poolType,
+        poolId: pool.id,
         openTimestamp: new Date(position.openTimestamp).toISOString(),
         closeTimestamp: new Date(position.closeTimestamp).toISOString(),
         openPrice: position.openPrice,
