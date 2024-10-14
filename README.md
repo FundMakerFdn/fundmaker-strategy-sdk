@@ -58,15 +58,29 @@ Notice that `startDate` defaults to the creation date of the pool, `endDate` def
 ```
 [
   {
-    "strategyName": "Strategy 1",
+    "strategyName": "ExampleStrat",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 8,
+    "volatilityThreshold": 10,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
-      "uptickPercent": 2,
-      "downtickPercent": 3
-    }
+      "uptickPercent": 0.2,
+      "downtickPercent": 0.3
+    },
+    "options": [
+      {
+        "nVega": 0.05,
+        "nDelta": 0.1,
+        "optionType": "call",
+        "moneyness": "ATM"
+      },
+      {
+        "nVega": 0.05,
+        "nDelta": 0.1,
+        "optionType": "put",
+        "moneyness": "ATM"
+      }
+    ]
   }
 ]
 ```
