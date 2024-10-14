@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 import { program } from "commander";
+import { getFirstSpotPrice, getHistIV, getPoolById } from "../src/db-utils.js";
 
 function readCSVFiles(directoryPath) {
   const files = fs
@@ -29,21 +30,43 @@ function calculateDTE(openTimestamp, closeTimestamp) {
   return Math.ceil((timeDiff / (1000 * 3600 * 24)) * 10) / 10;
 }
 
-function findMaxTheta(pnlPercent, dte, nVega, nDelta) {
-  // For a straddle strategy, we buy both a call and a put option
-  const maxProfit = Math.abs(pnlPercent);
+async function findMaxTheta(
+  pnlPercent,
+  dte,
+  nVega,
+  nDelta,
+  poolId,
+  openTimestamp,
+  closeTimestamp
+) {
+  debugger;
+  const pool = await getPoolById(poolId);
+  const spotSymbol = pool.type === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
 
-  // The maximum theta per day that still allows for profit, considering two options
-  let maxThetaPerDay = maxProfit / (dte * 2);
+  const openSpotPrice = await getFirstSpotPrice(spotSymbol, openTimestamp);
+  const closeSpotPrice = await getFirstSpotPrice(spotSymbol, closeTimestamp);
+  const openIV = await getHistIV("EVIV", openTimestamp);
+  const closeIV = await getHistIV("EVIV", closeTimestamp);
 
-  // Adjust maxThetaPerDay based on vega and delta
-  // maxThetaPerDay *= 1 + nVega * 0.05; // Example vega adjustment
-  // maxThetaPerDay *= 1 + nDelta * 0.1; // Example delta adjustment
+  if (!openSpotPrice || !closeSpotPrice || !openIV || !closeIV) {
+    console.error("Missing data for findMaxTheta calculation");
+    return null;
+  }
 
-  return maxThetaPerDay;
+  const spotPriceDiff = closeSpotPrice - openSpotPrice;
+  const ivDiff = closeIV - openIV;
+
+  const deltaPriceImpact = nDelta * spotPriceDiff;
+  const vegaPriceImpact = nVega * ivDiff;
+
+  const totalPriceImpact = deltaPriceImpact + vegaPriceImpact;
+
+  const maxTheta = (pnlPercent - totalPriceImpact) / dte;
+
+  return maxTheta;
 }
 
-function processData(data, strategy) {
+async function processData(data, strategy) {
   const results = [];
   const { nVega, nDelta } = strategy.options;
 
@@ -54,14 +77,22 @@ function processData(data, strategy) {
       const pnlPercent = parseFloat(record.pnlPercent);
       const dte = calculateDTE(record.openTimestamp, record.closeTimestamp);
 
-      const maxTheta = findMaxTheta(pnlPercent, dte, nVega, nDelta);
+      const maxTheta = await findMaxTheta(
+        pnlPercent,
+        dte,
+        nVega,
+        nDelta,
+        record.poolId,
+        record.openTimestamp,
+        record.closeTimestamp
+      );
 
       fileResults.push({
         ...record,
         dte,
         maxTheta,
-        // nVega,
-        // nDelta,
+        nVega,
+        nDelta,
       });
     }
 
@@ -79,11 +110,11 @@ function writeResults(results) {
   }
 }
 
-function main(directoryPath, strategyPath) {
+async function main(directoryPath, strategyPath) {
   const data = readCSVFiles(directoryPath);
   const strategy = JSON.parse(fs.readFileSync(strategyPath, "utf-8"))[0];
 
-  const results = processData(data, strategy);
+  const results = await processData(data, strategy);
 
   writeResults(results);
 }
@@ -92,9 +123,9 @@ program
   .description("CLI tool for options-based LP position hedging simulation")
   .requiredOption("-d, --directory <path>", "Input directory path")
   .requiredOption("-s, --strategy <path>", "Path to the strategy JSON file")
-  .action((options) => {
+  .action(async (options) => {
     try {
-      main(options.directory, options.strategy);
+      await main(options.directory, options.strategy);
     } catch (error) {
       console.error("An error occurred:", error);
     }

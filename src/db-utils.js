@@ -274,7 +274,12 @@ export const getFirstSpotPrice = handle(async (symbol, timestamp) => {
   const result = await db
     .select()
     .from(spot)
-    .where(and(eq(spot.symbol, symbol), lte(spot.timestamp, timestamp)))
+    .where(
+      and(
+        eq(spot.symbol, symbol),
+        lte(spot.timestamp, new Date(timestamp).getTime())
+      )
+    )
     .orderBy(desc(spot.timestamp))
     .limit(1)
     .execute();
@@ -286,7 +291,12 @@ export const getHistIV = handle(async (symbol, timestamp) => {
   const result = await db
     .select()
     .from(iv_hist)
-    .where(and(eq(iv_hist.symbol, symbol), lte(iv_hist.timestamp, timestamp)))
+    .where(
+      and(
+        eq(iv_hist.symbol, symbol),
+        lte(iv_hist.timestamp, new Date(timestamp).getTime())
+      )
+    )
     .orderBy(desc(iv_hist.timestamp))
     .limit(1)
     .execute();
