@@ -11,16 +11,12 @@
     },
     "options": [
       {
-        "nVega": 0.05,
-        "nDelta": 0.1,
         "optionType": "call",
-        "moneyness": "ATM"
+        "strikePrice": 1
       },
       {
-        "nVega": 0.05,
-        "nDelta": 0.1,
         "optionType": "put",
-        "moneyness": "ATM"
+        "strikePrice": 1
       }
     ]
   }

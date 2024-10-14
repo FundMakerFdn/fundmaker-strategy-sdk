@@ -11,35 +11,6 @@ function log(message) {
   }
 }
 
-function determineGreeksDirection(optionType, moneyness, spotPriceDiff) {
-  let deltaDirection = 1;
-  let vegaDirection = 1;
-
-  if (optionType === "call") {
-    deltaDirection = 1;
-  } else if (optionType === "put") {
-    deltaDirection = -1;
-  }
-
-  if (moneyness === "ITM") {
-    if (
-      (optionType === "call" && spotPriceDiff > 0) ||
-      (optionType === "put" && spotPriceDiff < 0)
-    ) {
-      vegaDirection = -1;
-    }
-  } else if (moneyness === "OTM") {
-    if (
-      (optionType === "call" && spotPriceDiff < 0) ||
-      (optionType === "put" && spotPriceDiff > 0)
-    ) {
-      vegaDirection = -1;
-    }
-  }
-
-  return { deltaDirection, vegaDirection };
-}
-
 function readCSVFiles(directoryPath) {
   const files = fs
     .readdirSync(directoryPath)
@@ -66,82 +37,62 @@ function calculateDTE(openTimestamp, closeTimestamp) {
   return Math.ceil((timeDiff / (1000 * 3600 * 24)) * 10) / 10;
 }
 
-function calculateMaxTheta(
-  pnlPercent,
-  dte,
-  nVega,
-  nDelta,
-  spotPriceDiff,
-  ivDiff,
-  optionType,
-  moneyness
-) {
-  const { deltaDirection, vegaDirection } = determineGreeksDirection(
-    optionType,
-    moneyness,
-    spotPriceDiff
-  );
+// Black-Scholes formula implementation
+function blackScholes(S, K, T, r, sigma, type) {
+  // Convert sigma from percentage to decimal
+  const sigmaDecimal = sigma / 100;
 
-  log(`Delta direction: ${deltaDirection}`);
-  log(`Vega direction: ${vegaDirection}`);
+  const d1 =
+    (Math.log(S / K) + (r + sigmaDecimal ** 2 / 2) * T) /
+    (sigmaDecimal * Math.sqrt(T));
+  const d2 = d1 - sigmaDecimal * Math.sqrt(T);
 
-  const deltaPriceImpact = nDelta * spotPriceDiff * deltaDirection;
-  const vegaPriceImpact = nVega * ivDiff * vegaDirection;
+  const Nd1 = cumulativeNormalDistribution(d1);
+  const Nd2 = cumulativeNormalDistribution(d2);
 
-  log(`Delta price impact: ${deltaPriceImpact}`);
-  log(`Vega price impact: ${vegaPriceImpact}`);
-
-  const totalPriceImpact = deltaPriceImpact + vegaPriceImpact;
-
-  log(`Total price impact: ${totalPriceImpact}`);
-
-  const maxTheta = (pnlPercent - totalPriceImpact) / dte;
-
-  log(`Calculated max theta: ${maxTheta}`);
-
-  return maxTheta;
+  if (type === "call") {
+    return S * Nd1 - K * Math.exp(-r * T) * Nd2;
+  } else {
+    return K * Math.exp(-r * T) * (1 - Nd2) - S * (1 - Nd1);
+  }
 }
 
-async function findMaxTheta(
-  pnlPercent,
-  dte,
-  nVega,
-  nDelta,
-  poolId,
-  openTimestamp,
-  closeTimestamp,
-  optionType,
-  moneyness
-) {
-  const pool = await getPoolById(poolId);
-  const spotSymbol = pool.type === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
+// Standard normal cumulative distribution function
+function cumulativeNormalDistribution(x) {
+  const t = 1 / (1 + 0.2316419 * Math.abs(x));
+  const d = 0.3989423 * Math.exp((-x * x) / 2);
+  let prob =
+    d *
+    t *
+    (0.3193815 +
+      t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
+  if (x > 0) prob = 1 - prob;
+  return prob;
+}
 
-  const openSpotPrice = await getFirstSpotPrice(spotSymbol, openTimestamp);
-  const closeSpotPrice = await getFirstSpotPrice(spotSymbol, closeTimestamp);
-  const openIV = await getHistIV("EVIV", openTimestamp);
-  const closeIV = await getHistIV("EVIV", closeTimestamp);
+// Calculate option greeks
+function calculateGreeks(S, K, T, r, sigma, type) {
+  // Convert sigma from percentage to decimal
+  const sigmaDecimal = sigma / 100;
 
-  if (!openSpotPrice || !closeSpotPrice || !openIV || !closeIV) {
-    console.error("Missing data for findMaxTheta calculation");
-    return null;
-  }
+  const d1 =
+    (Math.log(S / K) + (r + sigmaDecimal ** 2 / 2) * T) /
+    (sigmaDecimal * Math.sqrt(T));
+  const d2 = d1 - sigmaDecimal * Math.sqrt(T);
 
-  const spotPriceDiff = closeSpotPrice - openSpotPrice;
-  const ivDiff = closeIV - openIV;
+  const Nd1 = cumulativeNormalDistribution(d1);
+  const Nd2 = cumulativeNormalDistribution(d2);
+  const nPrimeD1 = Math.exp((-d1 * d1) / 2) / Math.sqrt(2 * Math.PI);
 
-  log(`${spotSymbol} spot price difference: ${spotPriceDiff}`);
-  log(`IV difference: ${ivDiff}`);
+  const delta = type === "call" ? Nd1 : Nd1 - 1;
+  const gamma = nPrimeD1 / (S * sigmaDecimal * Math.sqrt(T));
+  const vega = (S * nPrimeD1 * Math.sqrt(T)) / 100; // Expressed in terms of 1% change in volatility
+  const theta =
+    -(S * sigmaDecimal * nPrimeD1) / (2 * Math.sqrt(T)) / 365 -
+    (r * K * Math.exp(-r * T) * (type === "call" ? Nd2 : -Nd2)) / 365;
+  const rho = (K * T * Math.exp(-r * T) * (type === "call" ? Nd2 : -Nd2)) / 100; // Expressed in terms of 1% change in interest rate
 
-  return calculateMaxTheta(
-    pnlPercent,
-    dte,
-    nVega,
-    nDelta,
-    spotPriceDiff,
-    ivDiff,
-    optionType,
-    moneyness
-  );
+  return { delta, gamma, vega, theta, rho };
 }
 
 async function processData(data, strategy) {
@@ -159,34 +110,52 @@ async function processData(data, strategy) {
       log(`PNL Percent: ${pnlPercent}`);
       log(`DTE: ${dte}`);
 
+      const pool = await getPoolById(record.poolId);
+      const spotSymbol = pool.type === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
+      const spotPrice = await getFirstSpotPrice(
+        spotSymbol,
+        record.openTimestamp
+      );
+      const iv = await getHistIV("EVIV", record.openTimestamp);
+
+      if (!spotPrice || !iv) {
+        log(`Missing data for record: ${JSON.stringify(record)}`);
+        continue;
+      }
+
       const optionResults = await Promise.all(
         strategy.options.map(async (option, index) => {
           log(`Processing option ${index + 1}`);
-          const { nVega, nDelta, optionType, moneyness } = option;
-          log(
-            `Option details: nVega=${nVega}, nDelta=${nDelta}, type=${optionType}, moneyness=${moneyness}`
-          );
 
-          const maxTheta = await findMaxTheta(
-            pnlPercent,
-            dte,
-            nVega,
-            nDelta,
-            record.poolId,
-            record.openTimestamp,
-            record.closeTimestamp,
-            optionType,
-            moneyness
-          );
+          const strikePrice =
+            option.strikePrice === 1
+              ? spotPrice
+              : option.strikePrice * spotPrice;
+          const T = dte / 365; // Time to expiration in years
+          const r = 0.03;
 
-          log(`Calculated max theta for option ${index + 1}: ${maxTheta}`);
+          const price = blackScholes(
+            spotPrice,
+            strikePrice,
+            T,
+            r,
+            iv,
+            option.optionType
+          );
+          const greeks = calculateGreeks(
+            spotPrice,
+            strikePrice,
+            T,
+            r,
+            iv,
+            option.optionType
+          );
 
           return {
-            maxTheta,
-            nVega,
-            nDelta,
-            optionType,
-            moneyness,
+            optionType: option.optionType,
+            strikePrice,
+            price,
+            ...greeks,
           };
         })
       );
@@ -194,6 +163,8 @@ async function processData(data, strategy) {
       fileResults.push({
         ...record,
         dte,
+        spotPrice,
+        iv,
         options: optionResults,
       });
     }
@@ -202,29 +173,6 @@ async function processData(data, strategy) {
   }
 
   return results;
-}
-
-function writeResults(results) {
-  for (const { file, results: fileResults } of results) {
-    console.log(`Results for file: ${file}`);
-    for (const result of fileResults) {
-      console.log(`Position Details:`);
-      console.log(`  Pool Type: ${result.poolType}`);
-      console.log(`  PNL: ${result.pnlPercent}%`);
-      console.log(`  DTE: ${result.dte}`);
-      console.log("Options:");
-      result.options.forEach((option, index) => {
-        console.log(`  Option ${index + 1}:`);
-        console.log(`    Max Theta: ${option.maxTheta}`);
-        console.log(`    nVega: ${option.nVega}`);
-        console.log(`    nDelta: ${option.nDelta}`);
-        console.log(`    Option Type: ${option.optionType}`);
-        console.log(`    Moneyness: ${option.moneyness}`);
-      });
-      console.log("-----------------------------------");
-    }
-    console.log("\n");
-  }
 }
 
 async function main(directoryPath, strategyPath) {
@@ -249,3 +197,28 @@ program
   });
 
 program.parse(process.argv);
+
+function writeResults(results) {
+  for (const { file, results: fileResults } of results) {
+    console.log(`Results for ${file}:`);
+    for (const result of fileResults) {
+      console.log(`LP position PnL %: ${result.pnlPercent}`);
+      console.log(`DTE: ${result.dte}`);
+      console.log(`Spot Price: ${result.spotPrice.toFixed(2)}`);
+      console.log(`IV: ${result.iv.toFixed(4)}`);
+      console.log("Options:");
+      for (const option of result.options) {
+        console.log(`  Type: ${option.optionType}`);
+        console.log(`  Strike: ${option.strikePrice.toFixed(2)}`);
+        console.log(`  Price: ${option.price.toFixed(4)}`);
+        console.log(`  Delta: ${option.delta.toFixed(4)}`);
+        console.log(`  Gamma: ${option.gamma.toFixed(4)}`);
+        console.log(`  Vega: ${option.vega.toFixed(4)}`);
+        console.log(`  Theta: ${option.theta.toFixed(4)}`);
+        console.log(`  Rho: ${option.rho.toFixed(4)}`);
+        console.log("---");
+      }
+      console.log("================");
+    }
+  }
+}
