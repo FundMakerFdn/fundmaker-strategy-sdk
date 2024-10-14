@@ -2,6 +2,7 @@
 drizzle/
 input/
 *.csv
+src/config.js
 
 .aider.*
 

@@ -2,7 +2,14 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 import { program } from "commander";
-import { getFirstSpotPrice, getHistIV, getPoolById } from "../src/db-utils.js";
+import { getFirstSpotPrice, getHistIV, getPoolById } from "#src/db-utils.js";
+import CONFIG from "#src/config.js";
+
+function log(message) {
+  if (CONFIG.VERBOSE) {
+    console.log(message);
+  }
+}
 
 function determineGreeksDirection(optionType, moneyness, spotPriceDiff) {
   let deltaDirection = 1;
@@ -86,18 +93,31 @@ async function findMaxTheta(
   const spotPriceDiff = closeSpotPrice - openSpotPrice;
   const ivDiff = closeIV - openIV;
 
+  log(`${spotSymbol} spot price difference: ${spotPriceDiff}`);
+  log(`IV difference: ${ivDiff}`);
+
   const { deltaDirection, vegaDirection } = determineGreeksDirection(
     optionType,
     moneyness,
     spotPriceDiff
   );
 
+  log(`Delta direction: ${deltaDirection}`);
+  log(`Vega direction: ${vegaDirection}`);
+
   const deltaPriceImpact = nDelta * spotPriceDiff * deltaDirection;
   const vegaPriceImpact = nVega * ivDiff * vegaDirection;
 
+  log(`Delta price impact: ${deltaPriceImpact}`);
+  log(`Vega price impact: ${vegaPriceImpact}`);
+
   const totalPriceImpact = deltaPriceImpact + vegaPriceImpact;
 
+  log(`Total price impact: ${totalPriceImpact}`);
+
   const maxTheta = (pnlPercent - totalPriceImpact) / dte;
+
+  log(`Calculated max theta: ${maxTheta}`);
 
   return maxTheta;
 }
@@ -106,15 +126,25 @@ async function processData(data, strategy) {
   const results = [];
 
   for (const { file, records } of data) {
+    log(`Processing file: ${file}`);
     const fileResults = [];
 
     for (const record of records) {
+      log(`Processing record: ${JSON.stringify(record)}`);
       const pnlPercent = parseFloat(record.pnlPercent);
       const dte = calculateDTE(record.openTimestamp, record.closeTimestamp);
 
+      log(`PNL Percent: ${pnlPercent}`);
+      log(`DTE: ${dte}`);
+
       const optionResults = await Promise.all(
-        strategy.options.map(async (option) => {
+        strategy.options.map(async (option, index) => {
+          log(`Processing option ${index + 1}`);
           const { nVega, nDelta, optionType, moneyness } = option;
+          log(
+            `Option details: nVega=${nVega}, nDelta=${nDelta}, type=${optionType}, moneyness=${moneyness}`
+          );
+
           const maxTheta = await findMaxTheta(
             pnlPercent,
             dte,
@@ -126,6 +156,8 @@ async function processData(data, strategy) {
             optionType,
             moneyness
           );
+
+          log(`Calculated max theta for option ${index + 1}: ${maxTheta}`);
 
           return {
             maxTheta,
