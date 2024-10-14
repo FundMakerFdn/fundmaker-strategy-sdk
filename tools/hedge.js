@@ -66,6 +66,42 @@ function calculateDTE(openTimestamp, closeTimestamp) {
   return Math.ceil((timeDiff / (1000 * 3600 * 24)) * 10) / 10;
 }
 
+function calculateMaxTheta(
+  pnlPercent,
+  dte,
+  nVega,
+  nDelta,
+  spotPriceDiff,
+  ivDiff,
+  optionType,
+  moneyness
+) {
+  const { deltaDirection, vegaDirection } = determineGreeksDirection(
+    optionType,
+    moneyness,
+    spotPriceDiff
+  );
+
+  log(`Delta direction: ${deltaDirection}`);
+  log(`Vega direction: ${vegaDirection}`);
+
+  const deltaPriceImpact = nDelta * spotPriceDiff * deltaDirection;
+  const vegaPriceImpact = nVega * ivDiff * vegaDirection;
+
+  log(`Delta price impact: ${deltaPriceImpact}`);
+  log(`Vega price impact: ${vegaPriceImpact}`);
+
+  const totalPriceImpact = deltaPriceImpact + vegaPriceImpact;
+
+  log(`Total price impact: ${totalPriceImpact}`);
+
+  const maxTheta = (pnlPercent - totalPriceImpact) / dte;
+
+  log(`Calculated max theta: ${maxTheta}`);
+
+  return maxTheta;
+}
+
 async function findMaxTheta(
   pnlPercent,
   dte,
@@ -96,30 +132,16 @@ async function findMaxTheta(
   log(`${spotSymbol} spot price difference: ${spotPriceDiff}`);
   log(`IV difference: ${ivDiff}`);
 
-  const { deltaDirection, vegaDirection } = determineGreeksDirection(
+  return calculateMaxTheta(
+    pnlPercent,
+    dte,
+    nVega,
+    nDelta,
+    spotPriceDiff,
+    ivDiff,
     optionType,
-    moneyness,
-    spotPriceDiff
+    moneyness
   );
-
-  log(`Delta direction: ${deltaDirection}`);
-  log(`Vega direction: ${vegaDirection}`);
-
-  const deltaPriceImpact = nDelta * spotPriceDiff * deltaDirection;
-  const vegaPriceImpact = nVega * ivDiff * vegaDirection;
-
-  log(`Delta price impact: ${deltaPriceImpact}`);
-  log(`Vega price impact: ${vegaPriceImpact}`);
-
-  const totalPriceImpact = deltaPriceImpact + vegaPriceImpact;
-
-  log(`Total price impact: ${totalPriceImpact}`);
-
-  const maxTheta = (pnlPercent - totalPriceImpact) / dte;
-
-  log(`Calculated max theta: ${maxTheta}`);
-
-  return maxTheta;
 }
 
 async function processData(data, strategy) {
