@@ -238,11 +238,11 @@ async function main(directoryPath, strategyPath) {
 
 program
   .description("CLI tool for options-based LP position hedging simulation")
-  .requiredOption("-d, --directory <path>", "Input directory path")
+  .requiredOption("-i, --input <path>", "Input directory path")
   .requiredOption("-s, --strategy <path>", "Path to the strategy JSON file")
   .action(async (options) => {
     try {
-      await main(options.directory, options.strategy);
+      await main(options.input, options.strategy);
     } catch (error) {
       console.error("An error occurred:", error);
     }
