@@ -37,6 +37,13 @@ const CONFIG = {
   IV_SYMBOLS: ["BVIV", "EVIV"],
 
   dbFilename: "data.db",
+
+  // Options strike price steps
+  STRIKE_PRICE_STEPS: {
+    BNBUSDT: 10,
+    ETHUSDT: 50,
+    BTCUSDT: 500,
+  },
 };
 
 /*CONFIG.position = {

@@ -18,6 +18,7 @@
         "optionType": "put",
         "strikePrice": 1
       }
-    ]
+    ],
+    "riskFreeRate": 0.03
   }
 ]
