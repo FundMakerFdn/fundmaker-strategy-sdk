@@ -69,23 +69,20 @@ Notice that `startDate` defaults to the creation date of the pool, `endDate` def
     },
     "options": [
       {
-        "nVega": 0.05,
-        "nDelta": 0.1,
         "optionType": "call",
-        "moneyness": "ATM"
+        "strikePrice": 1
       },
       {
-        "nVega": 0.05,
-        "nDelta": 0.1,
         "optionType": "put",
-        "moneyness": "ATM"
+        "strikePrice": 1
       }
-    ]
+    ],
+    "riskFreeRate": 0.03
   }
 ]
 ```
 
-You can have multiple strategies in the same file, each strategy will be backtested with each pool.
+You can have multiple strategies in the same file, each strategy will be backtested with each pool. `"options"` section would be used later by `yarn hedge`.
 
 #### Running `yarn strategy`
 
