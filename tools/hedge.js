@@ -47,26 +47,33 @@ async function processData(data, strategy) {
       log(`Processing record: ${JSON.stringify(record)}`);
       const pnlPercent = parseFloat(record.pnlPercent);
       const dte = calculateDTE(record.openTimestamp, record.closeTimestamp);
+      const pool = await getPoolById(record.poolId);
 
       log(`PNL Percent: ${pnlPercent}`);
       log(`DTE: ${dte}`);
 
-      const pool = await getPoolById(record.poolId);
-      const spotSymbol = pool.type === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
-      const spotPrice = await getFirstSpotPrice(
-        spotSymbol,
-        record.openTimestamp
-      );
-      const iv = await getHistIV("EVIV", record.openTimestamp);
-
-      if (!spotPrice || !iv) {
-        log(`Missing data for record: ${JSON.stringify(record)}`);
-        continue;
-      }
-
       const optionResults = await Promise.all(
         strategy.options.map(async (option, index) => {
           log(`Processing option ${index + 1}`);
+
+          let spotSymbol;
+          if (option.spotSymbol) {
+            spotSymbol = option.spotSymbol;
+          } else {
+            spotSymbol = pool.type === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
+          }
+          const spotPrice = await getFirstSpotPrice(
+            spotSymbol,
+            record.openTimestamp
+          );
+          const iv = await getHistIV("EVIV", record.openTimestamp);
+
+          if (!spotPrice || !iv) {
+            log(
+              `Missing data for option ${index + 1}: ${JSON.stringify(option)}`
+            );
+            return null;
+          }
 
           const stepSize = CONFIG.STRIKE_PRICE_STEPS[spotSymbol] || 1;
           const adjustedStrikeMultiplier = adjustStrikePrice(
@@ -99,17 +106,26 @@ async function processData(data, strategy) {
           return {
             optionType: option.optionType,
             strikePrice,
-            price,
+            spotPrice,
+            spotSymbol,
+            premium: price,
             ...greeks,
           };
         })
       );
 
+      const validOptionResults = optionResults.filter(
+        (result) => result !== null
+      );
+
+      if (validOptionResults.length === 0) {
+        log(`No valid options for record: ${JSON.stringify(record)}`);
+        continue;
+      }
+
       fileResults.push({
         ...record,
         dte,
-        spotPrice,
-        iv,
         options: optionResults,
       });
     }

@@ -12,11 +12,13 @@
     "options": [
       {
         "optionType": "call",
-        "strikePrice": 1
+        "strikePrice": 1,
+        "spotSymbol": "ETHUSDT"
       },
       {
         "optionType": "put",
-        "strikePrice": 1
+        "strikePrice": 1,
+        "spotSymbol": "ETHUSDT"
       }
     ],
     "riskFreeRate": 0.03
