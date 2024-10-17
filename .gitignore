@@ -3,6 +3,7 @@ drizzle/
 input/
 *.csv
 src/config.js
+input/strategy.json
 
 .aider.*
 

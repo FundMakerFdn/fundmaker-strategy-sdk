@@ -6,8 +6,7 @@
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
-      "uptickPercent": 0.2,
-      "downtickPercent": 0.3
+      "fullRange": true
     },
     "options": [
       {

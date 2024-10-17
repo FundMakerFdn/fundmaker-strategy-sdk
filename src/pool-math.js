@@ -9,13 +9,19 @@ const Q96 = new bn(2).pow(96);
 const Q128 = new bn(2).pow(128);
 const ZERO = new bn(0);
 
-export const getFeeTierPercentage = function (tier) {
+export const TICK_MIN = -887272;
+export const TICK_MAX = 887272;
+// Lower tick corresponds to higher price
+export const PRICE_MIN = getPriceFromTick(TICK_MAX);
+export const PRICE_MAX = getPriceFromTick(TICK_MIN);
+
+export function getFeeTierPercentage(tier) {
   return Number(tier) / 1000000;
-};
+}
 
 // The function to analyze onchain positions
 // Ref: https://ethereum.stackexchange.com/a/144704
-export const calculatePositionFees = (pool, position, token0, token1) => {
+export function calculatePositionFees(pool, position, token0, token1) {
   const tickCurrent = Number(pool.tick);
   const tickLower = Number(position.tickLower.tickIdx);
   const tickUpper = Number(position.tickUpper.tickIdx);
@@ -122,17 +128,17 @@ export const calculatePositionFees = (pool, position, token0, token1) => {
     uncollectedFeesAdjusted_0.toNumber(),
     uncollectedFeesAdjusted_1.toNumber(),
   ];
-};
+}
 
-export const getTickFromPrice = (price, token0Decimal, token1Decimal) => {
+export function getTickFromPrice(price, token0Decimal, token1Decimal) {
   const token0 = expandDecimals(price, Number(token0Decimal));
   const token1 = expandDecimals(1, Number(token1Decimal));
   const sqrtPrice = encodeSqrtPriceX96(token1).div(encodeSqrtPriceX96(token0));
 
   return Math.log(sqrtPrice.toNumber()) / Math.log(Math.sqrt(1.0001));
-};
+}
 
-export const getPriceFromTick = (tick, token0Decimal, token1Decimal) => {
+export function getPriceFromTick(tick, token0Decimal = 0, token1Decimal = 0) {
   const sqrtPrice = new bn(Math.pow(Math.sqrt(1.0001), tick)).multipliedBy(
     new bn(2).pow(96)
   );
@@ -149,10 +155,10 @@ export const getPriceFromTick = (tick, token0Decimal, token1Decimal) => {
     .pow(2);
 
   return price.toNumber();
-};
+}
 
 // Calculate the position tokens deposit ratio.
-export const getPositionTokensDepositRatio = (P, Pl, Pu) => {
+export function getPositionTokensDepositRatio(P, Pl, Pu) {
   const deltaL = 1000; // can be any number
 
   let deltaY = deltaL * (Math.sqrt(P) - Math.sqrt(Pl));
@@ -164,16 +170,16 @@ export const getPositionTokensDepositRatio = (P, Pl, Pu) => {
   if (P >= Pu) deltaX = 0;
 
   return deltaY / deltaX;
-};
+}
 
-export const getTokensAmountFromDepositAmountUSD = (
+export function getTokensAmountFromDepositAmountUSD(
   P,
   Pl,
   Pu,
   priceUSDX,
   priceUSDY,
   depositAmountUSD
-) => {
+) {
   const deltaL =
     depositAmountUSD /
     ((Math.sqrt(P) - Math.sqrt(Pl)) * priceUSDY +
@@ -194,28 +200,28 @@ export const getTokensAmountFromDepositAmountUSD = (
     amount1: deltaY,
     liquidityDelta: deltaL,
   };
-};
+}
 
 // for calculation detail, please visit README.md (Section: Calculation Breakdown, No. 2)
-const getLiquidityForAmount0 = (sqrtRatioAX96, sqrtRatioBX96, amount0) => {
+function getLiquidityForAmount0(sqrtRatioAX96, sqrtRatioBX96, amount0) {
   // amount0 * (sqrt(upper) * sqrt(lower)) / (sqrt(upper) - sqrt(lower))
   const intermediate = mulDiv(sqrtRatioBX96, sqrtRatioAX96, Q96);
   return mulDiv(amount0, intermediate, sqrtRatioBX96.minus(sqrtRatioAX96));
-};
+}
 
-const getLiquidityForAmount1 = (sqrtRatioAX96, sqrtRatioBX96, amount1) => {
+function getLiquidityForAmount1(sqrtRatioAX96, sqrtRatioBX96, amount1) {
   // amount1 / (sqrt(upper) - sqrt(lower))
   return mulDiv(amount1, Q96, sqrtRatioBX96.minus(sqrtRatioAX96));
-};
+}
 
-const getSqrtPriceX96 = (price, token0Decimal, token1Decimal) => {
+function getSqrtPriceX96(price, token0Decimal, token1Decimal) {
   const token0 = expandDecimals(price, token0Decimal);
   const token1 = expandDecimals(1, token1Decimal);
 
   return token0.div(token1).sqrt().multipliedBy(Q96);
-};
+}
 
-export const getLiquidityDelta = (
+export function getLiquidityDelta(
   P,
   lowerP,
   upperP,
@@ -223,7 +229,7 @@ export const getLiquidityDelta = (
   amount1,
   token0Decimal,
   token1Decimal
-) => {
+) {
   const amt0 = expandDecimals(amount0, token1Decimal);
   const amt1 = expandDecimals(amount1, token0Decimal);
 
@@ -252,9 +258,9 @@ export const getLiquidityDelta = (
   }
 
   return liquidity;
-};
+}
 
-export const estimateFee = (liquidityDelta, liquidity, volumeUSD, feeTier) => {
+export function estimateFee(liquidityDelta, liquidity, volumeUSD, feeTier) {
   const feeTierPercentage = getFeeTierPercentage(feeTier);
   const liquidityPercentage = new bn(liquidityDelta).div(
     new bn(liquidity).plus(liquidityDelta)
@@ -264,9 +270,9 @@ export const estimateFee = (liquidityDelta, liquidity, volumeUSD, feeTier) => {
     .multipliedBy(feeTierPercentage)
     .multipliedBy(liquidityPercentage)
     .toNumber();
-};
+}
 
-export const getLiquidityFromTick = (poolTicks, tick) => {
+export function getLiquidityFromTick(poolTicks, tick) {
   // calculate a cumulative of liquidityNet from all ticks that poolTicks[i] <= tick
   let liquidity = new bn(0);
   for (let i = 0; i < poolTicks.length - 1; ++i) {
@@ -281,37 +287,38 @@ export const getLiquidityFromTick = (poolTicks, tick) => {
   }
 
   return liquidity;
-};
+}
 
-export const encodeSqrtPriceX96 = (price) => {
+export function encodeSqrtPriceX96(price) {
   return new bn(price).sqrt().multipliedBy(Q96).integerValue(bn.ROUND_FLOOR);
-};
+}
 
-export const decodeSqrtPriceX96 = (sqrtPrice) => {
+export function decodeSqrtPriceX96(sqrtPrice) {
   return new bn(sqrtPrice).div(Q96).pow(2);
-};
+}
 
-export const expandDecimals = (n, exp) => {
+export function expandDecimals(n, exp = 1) {
   return new bn(n).multipliedBy(new bn(10).pow(exp));
-};
+}
 
-export const decodePrice = (sqrtPrice, pool) =>
-  +expandDecimals(
+export function decodePrice(sqrtPrice, pool) {
+  return +expandDecimals(
     decodeSqrtPriceX96(sqrtPrice),
     pool.token0Decimals - pool.token1Decimals
   );
+}
 
-const mulDiv = (a, b, multiplier) => {
+function mulDiv(a, b, multiplier) {
   return a.multipliedBy(b).div(multiplier);
-};
+}
 
-export const calculateIL = (
+export function calculateIL(
   futurePrice,
   priceRangeValue,
   liquidityDelta,
   amount0,
   amount1
-) => {
+) {
   let Pl = priceRangeValue[0];
   let Pu = priceRangeValue[1];
 
@@ -347,12 +354,12 @@ export const calculateIL = (
     totalValueB,
     ILPercentage,
   };
-};
+}
 
-export const calculateStandardDeviation = (values) => {
+export function calculateStandardDeviation(values) {
   const mean = values.reduce((sum, value) => sum + value, 0) / values.length;
   const variance =
     values.reduce((sum, value) => sum + Math.pow(value - mean, 2), 0) /
     values.length;
   return Math.sqrt(variance);
-};
+}

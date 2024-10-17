@@ -5,6 +5,8 @@ import {
   getLiquidityDelta,
   estimateFee,
   calculateIL,
+  PRICE_MIN,
+  PRICE_MAX,
 } from "./pool-math.js";
 import { getPrices, getPoolMetadata, getAllTrades } from "./db-utils.js";
 import bn from "bignumber.js";
@@ -41,8 +43,12 @@ export async function simulatePosition(position) {
     return;
   }
 
-  const priceHigh = open.price + (open.price * position.uptickPercent) / 100;
-  const priceLow = open.price - (open.price * position.downtickPercent) / 100;
+  const priceHigh = position.fullRange
+    ? PRICE_MAX
+    : open.price + (open.price * position.uptickPercent) / 100;
+  const priceLow = position.fullRange
+    ? PRICE_MIN
+    : open.price - (open.price * position.downtickPercent) / 100;
 
   log("Position value (USD):", position.amountUSD);
   log("Entry price:", p(open.price));

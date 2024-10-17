@@ -13,7 +13,12 @@ import {
 } from "#src/db-utils.js";
 import { fetchData } from "#src/fetcher.js";
 import CONFIG from "#src/config.js";
-import { decodePrice, calculateStandardDeviation } from "#src/pool-math.js";
+import {
+  decodePrice,
+  calculateStandardDeviation,
+  PRICE_MIN,
+  PRICE_MAX,
+} from "#src/pool-math.js";
 import { fetchPool } from "#src/fetch-utils.js";
 
 // Function to read CSV file using fast-csv
@@ -134,8 +139,9 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       poolAddress: pool.address,
       openTime: new Date(position.openTimestamp),
       closeTime: new Date(position.closeTimestamp),
-      uptickPercent: strategy.priceRange.uptickPercent,
-      downtickPercent: strategy.priceRange.downtickPercent,
+      uptickPercent: strategy?.priceRange?.uptickPercent,
+      downtickPercent: strategy?.priceRange?.downtickPercent,
+      fullRange: strategy?.priceRange?.fullRange,
       amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
     });
     console.log("Closed position with PnL (%):", pnlPercent);
@@ -180,8 +186,8 @@ async function writeOutputCSV(results, outputDir) {
         openTimestamp: new Date(position.openTimestamp).toISOString(),
         closeTimestamp: new Date(position.closeTimestamp).toISOString(),
         openPrice: position.openPrice,
-        targetUptickPrice: position.targetUptickPrice,
-        targetDowntickPrice: position.targetDowntickPrice,
+        targetUptickPrice: position.targetUptickPrice || PRICE_MAX,
+        targetDowntickPrice: position.targetDowntickPrice || PRICE_MIN,
         pnlPercent: position.pnlPercent,
       });
     });
