@@ -14,14 +14,16 @@
         "strikePrice": 1,
         "spotSymbol": "ETHUSDT",
         "askBidRatio": 1.1,
-        "askIndexIVRatio": 0.56
+        "askIndexIVRatio": 0.56,
+        "dte": 7
       },
       {
         "optionType": "put",
         "strikePrice": 1,
         "spotSymbol": "ETHUSDT",
         "askBidRatio": 1.1,
-        "askIndexIVRatio": 0.56
+        "askIndexIVRatio": 0.56,
+        "dte": 7
       }
     ],
     "riskFreeRate": 0.03

@@ -69,3 +69,55 @@ export function calculateGreeks(S, K, T, r, sigma, type) {
 
   return { delta, gamma, vega, theta, rho };
 }
+
+export function calculateExpirationDate(openDate, dte) {
+  const validDTEs = [0, 3, 7, 14, 21, 30, 60, 90, 180, 252, 365];
+  if (!validDTEs.includes(dte)) {
+    throw new Error(
+      `Invalid DTE: ${dte}. Must be one of ${validDTEs.join(", ")}.`
+    );
+  }
+
+  let expirationDate = new Date(openDate);
+  expirationDate.setUTCHours(8, 0, 0, 0); // Set to 8 AM UTC
+
+  if (dte === 0) {
+    // If 8 AM UTC has already passed, move to the next day
+    if (expirationDate <= openDate) {
+      expirationDate.setUTCDate(expirationDate.getUTCDate() + 1);
+    }
+  } else if (dte <= 30) {
+    // For DTE <= 30, calculate more precisely
+    const hoursToAdd = dte * 24;
+    expirationDate = new Date(openDate.getTime() + hoursToAdd * 60 * 60 * 1000);
+
+    // Align to 8 AM UTC
+    expirationDate.setUTCHours(8, 0, 0, 0);
+
+    // If the calculated time is before the current time, move to the next day
+    if (expirationDate <= openDate) {
+      expirationDate.setUTCDate(expirationDate.getUTCDate() + 1);
+    }
+
+    // For 3 DTE, ensure it's not more than 72 hours from now
+    if (dte === 3) {
+      const maxExpirationDate = new Date(
+        openDate.getTime() + 72 * 60 * 60 * 1000
+      );
+      if (expirationDate > maxExpirationDate) {
+        expirationDate = maxExpirationDate;
+        expirationDate.setUTCHours(8, 0, 0, 0);
+      }
+    }
+  } else {
+    // For longer-term options, add the number of days
+    expirationDate.setUTCDate(expirationDate.getUTCDate() + dte);
+  }
+
+  // Final check to ensure the expiration date is always in the future
+  while (expirationDate <= openDate) {
+    expirationDate.setUTCDate(expirationDate.getUTCDate() + 1);
+  }
+
+  return expirationDate;
+}

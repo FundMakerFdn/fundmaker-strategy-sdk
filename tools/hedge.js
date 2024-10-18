@@ -4,10 +4,10 @@ import { parse } from "csv-parse/sync";
 import { program } from "commander";
 import { getFirstSpotPrice, getHistIV, getPoolById } from "#src/db-utils.js";
 import {
-  calculateDTE,
   blackScholes,
   calculateGreeks,
   adjustStrikePrice,
+  calculateExpirationDate,
 } from "#src/options-math.js";
 import CONFIG from "#src/config.js";
 
@@ -46,11 +46,10 @@ async function processData(data, strategy) {
     for (const record of records) {
       log(`Processing record: ${JSON.stringify(record)}`);
       const pnlPercent = parseFloat(record.pnlPercent);
-      const dte = calculateDTE(record.openTimestamp, record.closeTimestamp);
+      // DTE calculation is now handled per option
       const pool = await getPoolById(record.poolId);
 
       log(`PNL Percent: ${pnlPercent}`);
-      log(`DTE: ${dte}`);
 
       const optionResults = await Promise.all(
         strategy.options.map(async (option, index) => {
@@ -83,7 +82,14 @@ async function processData(data, strategy) {
           );
           const strikePrice = adjustedStrikeMultiplier * spotPrice;
 
-          const T = dte / 365;
+          const expirationDate = calculateExpirationDate(
+            new Date(record.openTimestamp),
+            option.dte
+          );
+          const T =
+            (expirationDate.getTime() -
+              new Date(record.openTimestamp).getTime()) /
+            (1000 * 60 * 60 * 24 * 365);
           const r = strategy?.riskFreeRate || 0;
 
           // Apply askIndexIVRatio to get the option's ask IV
@@ -118,6 +124,7 @@ async function processData(data, strategy) {
             bidPremium: bidPrice,
             askIV,
             indexIV,
+            expirationDate: expirationDate.toISOString(),
             ...greeks,
           };
         })
@@ -132,10 +139,51 @@ async function processData(data, strategy) {
         continue;
       }
 
+      // Calculate pnlOptions and pnlCombined
+      let pnlOptions = 0;
+      const updatedOptions = await Promise.all(
+        validOptionResults.map(async (option) => {
+          const endSpotPrice = await getFirstSpotPrice(
+            option.spotSymbol,
+            record.closeTimestamp
+          );
+          const endIndexIV = await getHistIV("EVIV", record.closeTimestamp);
+          const endAskIV =
+            endIndexIV *
+            strategy.options.find((o) => o.optionType === option.optionType)
+              .askIndexIVRatio;
+
+          const endPrice = blackScholes(
+            endSpotPrice,
+            option.strikePrice,
+            0.00001, // Very small time to expiry
+            strategy.riskFreeRate,
+            endAskIV,
+            option.optionType
+          );
+
+          const endBidPrice =
+            endPrice /
+            strategy.options.find((o) => o.optionType === option.optionType)
+              .askBidRatio;
+          const optionPnl = endBidPrice - option.askPremium;
+          pnlOptions += optionPnl;
+
+          return {
+            ...option,
+            endBidPrice,
+            optionPnl,
+          };
+        })
+      );
+
+      const pnlCombined = parseFloat(record.pnlPercent) + pnlOptions;
+
       fileResults.push({
         ...record,
-        dte,
-        options: optionResults,
+        options: updatedOptions,
+        pnlOptions,
+        pnlCombined,
       });
     }
 
