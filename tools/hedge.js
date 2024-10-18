@@ -66,9 +66,9 @@ async function processData(data, strategy) {
             spotSymbol,
             record.openTimestamp
           );
-          const iv = await getHistIV("EVIV", record.openTimestamp);
+          const indexIV = await getHistIV("EVIV", record.openTimestamp);
 
-          if (!spotPrice || !iv) {
+          if (!spotPrice || !indexIV) {
             log(
               `Missing data for option ${index + 1}: ${JSON.stringify(option)}`
             );
@@ -86,12 +86,15 @@ async function processData(data, strategy) {
           const T = dte / 365;
           const r = strategy?.riskFreeRate || 0;
 
+          // Apply askIndexIVRatio to get the option's ask IV
+          const askIV = indexIV * option.askIndexIVRatio;
+
           const price = blackScholes(
             spotPrice,
             strikePrice,
             T,
             r,
-            iv,
+            askIV,
             option.optionType
           );
           const greeks = calculateGreeks(
@@ -99,16 +102,22 @@ async function processData(data, strategy) {
             strikePrice,
             T,
             r,
-            iv,
+            askIV,
             option.optionType
           );
+
+          // Apply askBidRatio to calculate the bid price
+          const bidPrice = price / option.askBidRatio;
 
           return {
             optionType: option.optionType,
             strikePrice,
             spotPrice,
             spotSymbol,
-            premium: price,
+            askPremium: price,
+            bidPremium: bidPrice,
+            askIV,
+            indexIV,
             ...greeks,
           };
         })
