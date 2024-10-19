@@ -1,0 +1,229 @@
+[1mdiff --git a/input/strategy.json b/input/strategy.json[m
+[1mindex e9ed1fc..b6e38e7 100644[m
+[1m--- a/input/strategy.json[m
+[1m+++ b/input/strategy.json[m
+[36m@@ -6,7 +6,12 @@[m
+     "hoursCheckClose": [10],[m
+     "positionOpenDays": 3,[m
+     "priceRange": {[m
+[31m-      "fullRange": true[m
+[32m+[m[32m      "uptickPercent": 4,[m
+[32m+[m[32m      "downtickPercent": 4[m
+[32m+[m[32m    },[m
+[32m+[m[32m    "rebalance": {[m
+[32m+[m[32m      "uptickPercent": 2,[m
+[32m+[m[32m      "downtickPercent": 2[m
+     },[m
+     "options": [[m
+       {[m
+[1mdiff --git a/src/config.js b/src/config.js[m
+[1mindex 5468129..cbaaca0 100644[m
+[1m--- a/src/config.js[m
+[1m+++ b/src/config.js[m
+[36m@@ -27,7 +27,7 @@[m [mconst CONFIG = {[m
+   // Default simulation position size[m
+   DEFAULT_POS_USD: 100,[m
+ [m
+[31m-  VERBOSE: false,[m
+[32m+[m[32m  VERBOSE: true,[m
+ [m
+   // Constants for fetch-spot[m
+   SPOT_API_URL: "https://api.binance.com/api/v3/klines",[m
+[1mdiff --git a/src/fetcher.js b/src/fetcher.js[m
+[1mindex 6ef8077..29daea3 100644[m
+[1m--- a/src/fetcher.js[m
+[1m+++ b/src/fetcher.js[m
+[36m@@ -5,7 +5,7 @@[m [mimport {[m
+ } from "./fetch-utils.js";[m
+ import CONFIG from "./config.js";[m
+ import { padDateMS } from "./misc-utils.js";[m
+[31m-import { rollingRealizedVolatility } from "./volatility.js";[m
+[32m+[m[32m//import { rollingRealizedVolatility } from "./volatility.js";[m
+ import { getPoolById } from "#src/db-utils.js";[m
+ [m
+ export async function fetchData(config) {[m
+[36m@@ -38,8 +38,8 @@[m [mexport async function fetchData(config) {[m
+   }[m
+   console.log("Fetched trades.");[m
+ [m
+[31m-  console.log("Calculating realized volatility...");[m
+[31m-  await rollingRealizedVolatility(config.poolId, startDate, endDate);[m
+[32m+[m[32m  /*console.log("Calculating realized volatility...");[m
+[32m+[m[32m  await rollingRealizedVolatility(config.poolId, startDate, endDate);*/[m
+ }[m
+ [m
+ // Start the main function[m
+[1mdiff --git a/src/misc-utils.js b/src/misc-utils.js[m
+[1mindex 4649ab8..7618811 100644[m
+[1m--- a/src/misc-utils.js[m
+[1m+++ b/src/misc-utils.js[m
+[36m@@ -22,3 +22,6 @@[m [mexport const handle = (func, errStr) => {[m
+ [m
+ export const padDateMS = (pad, date) =>[m
+   new Date(new Date(date).getTime() + pad);[m
+[32m+[m
+[32m+[m[32mexport const incPercent = (n, p) => n + (n * p) / 100;[m
+[32m+[m[32mexport const decPercent = (n, p) => n - (n * p) / 100;[m
+[1mdiff --git a/src/simulate.js b/src/simulate.js[m
+[1mindex 214d131..1b6b1b1 100644[m
+[1m--- a/src/simulate.js[m
+[1m+++ b/src/simulate.js[m
+[36m@@ -10,7 +10,7 @@[m [mimport {[m
+ } from "./pool-math.js";[m
+ import { getPrices, getPoolMetadata, getAllTrades } from "./db-utils.js";[m
+ import bn from "bignumber.js";[m
+[31m-import { mm } from "./misc-utils.js";[m
+[32m+[m[32mimport { incPercent, decPercent, mm } from "./misc-utils.js";[m
+ [m
+ async function getDecodedPrices(pool, timestamp) {[m
+   const prices = await getPrices(pool.id, timestamp);[m
+[36m@@ -28,9 +28,35 @@[m [mfunction printPosition(pool, [amount0, amount1]) {[m
+   log(`Position ${pool.token1Symbol}: ${amount1}`);[m
+ }[m
+ [m
+[32m+[m[32mfunction calculatePriceRange(currentPrice, pos) {[m
+[32m+[m[32m  let price = {};[m
+[32m+[m[32m  if (pos.fullRange) {[m
+[32m+[m[32m    price = {[m
+[32m+[m[32m      high: PRICE_MAX,[m
+[32m+[m[32m      low: PRICE_MIN,[m
+[32m+[m[32m    };[m
+[32m+[m[32m  } else {[m
+[32m+[m[32m    price = {[m
+[32m+[m[32m      high: incPercent(currentPrice, pos.priceRange.uptickPercent),[m
+[32m+[m[32m      low: decPercent(currentPrice, pos.priceRange.downtickPercent),[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m[32m  let rebalance = { high: PRICE_MAX, low: PRICE_MIN };[m
+[32m+[m[32m  if (pos.rebalance) {[m
+[32m+[m[32m    rebalance = {[m
+[32m+[m[32m      high: incPercent(currentPrice, pos.rebalance.uptickPercent),[m
+[32m+[m[32m      low: decPercent(currentPrice, pos.rebalance.downtickPercent),[m
+[32m+[m[32m    };[m
+[32m+[m[32m  }[m
+[32m+[m[32m  return {[m
+[32m+[m[32m    price,[m
+[32m+[m[32m    rebalance,[m
+[32m+[m[32m  };[m
+[32m+[m[32m}[m
+[32m+[m
+ export async function simulatePosition(position) {[m
+   if (!position.amountUSD) position.amountUSD = CONFIG.DEFAULT_POS_USD;[m
+[31m-  const p = position.invPrices ? (p) => 1 / p : (p) => p;[m
+[32m+[m[32m  const p = true ? (p) => 1 / p : (p) => p;[m
+   let pool, open, close;[m
+ [m
+   try {[m
+[36m@@ -43,23 +69,25 @@[m [mexport async function simulatePosition(position) {[m
+     return;[m
+   }[m
+ [m
+[31m-  const priceHigh = position.fullRange[m
+[31m-    ? PRICE_MAX[m
+[31m-    : open.price + (open.price * position.uptickPercent) / 100;[m
+[31m-  const priceLow = position.fullRange[m
+[31m-    ? PRICE_MIN[m
+[31m-    : open.price - (open.price * position.downtickPercent) / 100;[m
+[32m+[m[32m  let currentRange = calculatePriceRange(open.price, position);[m
+ [m
+   log("Position value (USD):", position.amountUSD);[m
+   log("Entry price:", p(open.price));[m
+[31m-  log("Price low, high:", ...mm(p(priceHigh), p(priceLow)));[m
+[32m+[m[32m  log([m
+[32m+[m[32m    "Price low, high:",[m
+[32m+[m[32m    ...mm(p(currentRange.price.high), p(currentRange.price.low))[m
+[32m+[m[32m  );[m
+[32m+[m[32m  log([m
+[32m+[m[32m    "Rebalance low, high:",[m
+[32m+[m[32m    ...mm(p(currentRange.rebalance.low), p(currentRange.rebalance.high))[m
+[32m+[m[32m  );[m
+   log("Token prices at open:", open.price0, open.price1);[m
+ [m
+   // Calculate initial position[m
+   let pos = getTokensAmountFromDepositAmountUSD([m
+     open.price,[m
+[31m-    priceLow,[m
+[31m-    priceHigh,[m
+[32m+[m[32m    currentRange.price.low,[m
+[32m+[m[32m    currentRange.price.high,[m
+     open.price0,[m
+     open.price1,[m
+     position.amountUSD[m
+[36m@@ -76,7 +104,7 @@[m [mexport async function simulatePosition(position) {[m
+   let future = { ...pos };[m
+ [m
+   // Track whether the price is within the range[m
+[31m-  let inRange = true;[m
+[32m+[m[32m  let inPriceRange = true;[m
+ [m
+   for (const trade of trades) {[m
+     const volumeUSD = new bn(trade.amountUSD);[m
+[36m@@ -84,23 +112,36 @@[m [mexport async function simulatePosition(position) {[m
+ [m
+     // Calculate the pos trade price[m
+     const tradePrice = decodePrice(trade.sqrtPriceX96, pool);[m
+[31m-    // Check if the price is within the defined range[m
+[31m-    if (tradePrice < priceLow || tradePrice > priceHigh) {[m
+[31m-      if (inRange) {[m
+[32m+[m
+[32m+[m[32m    if (position.rebalance) {[m
+[32m+[m[32m      if ([m
+[32m+[m[32m        tradePrice < currentRange.rebalance.low ||[m
+[32m+[m[32m        tradePrice > currentRange.rebalance.high[m
+[32m+[m[32m      ) {[m
+[32m+[m[32m        log("REBALANCING", p(tradePrice), future.amount0, future.amount1);[m
+[32m+[m[32m        currentRange = calculatePriceRange(tradePrice, position);[m
+[32m+[m[32m        inPriceRange = false; // to trigger deltaL recalculation[m
+[32m+[m[32m      }[m
+[32m+[m[32m    }[m
+[32m+[m[32m    if ([m
+[32m+[m[32m      tradePrice < currentRange.price.low ||[m
+[32m+[m[32m      tradePrice > currentRange.price.high[m
+[32m+[m[32m    ) {[m
+[32m+[m[32m      if (inPriceRange) {[m
+         // If the price leaves the range, freeze the token amounts[m
+         log("OUT OF RANGE:", tradePrice, future.amount0, future.amount1);[m
+[31m-        inRange = false;[m
+[32m+[m[32m        inPriceRange = false;[m
+       }[m
+     } else {[m
+[31m-      if (!inRange) {[m
+[32m+[m[32m      if (!inPriceRange) {[m
+         log("IN RANGE:", tradePrice, future.amount0, future.amount1);[m
+[31m-        inRange = true;[m
+[32m+[m[32m        inPriceRange = true;[m
+       }[m
+ [m
+       const deltaL = getLiquidityDelta([m
+         tradePrice,[m
+[31m-        priceLow,[m
+[31m-        priceHigh,[m
+[32m+[m[32m        currentRange.price.low,[m
+[32m+[m[32m        currentRange.price.high,[m
+         pos.amount0,[m
+         pos.amount1,[m
+         pool.token0Decimals,[m
+[36m@@ -128,7 +169,7 @@[m [mexport async function simulatePosition(position) {[m
+ [m
+   const { totalValueB: newValueUSD, ILPercentage } = calculateIL([m
+     [close.price0, close.price1],[m
+[31m-    mm(1 / priceLow, 1 / priceHigh),[m
+[32m+[m[32m    mm(1 / currentRange.price.low, 1 / currentRange.price.high),[m
+     pos.liquidityDelta,[m
+     pos.amount0,[m
+     pos.amount1[m
+[1mdiff --git a/tools/strategy.js b/tools/strategy.js[m
+[1mindex 9619b83..6603408 100644[m
+[1m--- a/tools/strategy.js[m
+[1m+++ b/tools/strategy.js[m
+[36m@@ -139,8 +139,8 @@[m [masync function executeStrategy(db, pool, startDate, endDate, strategy) {[m
+       poolAddress: pool.address,[m
+       openTime: new Date(position.openTimestamp),[m
+       closeTime: new Date(position.closeTimestamp),[m
+[31m-      uptickPercent: strategy?.priceRange?.uptickPercent,[m
+[31m-      downtickPercent: strategy?.priceRange?.downtickPercent,[m
+[32m+[m[32m      priceRange: strategy?.priceRange,[m
+[32m+[m[32m      rebalance: strategy?.rebalance,[m
+       fullRange: strategy?.priceRange?.fullRange,[m
+       amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,[m
+     });[m

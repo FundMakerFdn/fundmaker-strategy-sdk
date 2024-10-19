@@ -5,7 +5,7 @@ import {
 } from "./fetch-utils.js";
 import CONFIG from "./config.js";
 import { padDateMS } from "./misc-utils.js";
-import { rollingRealizedVolatility } from "./volatility.js";
+//import { rollingRealizedVolatility } from "./volatility.js";
 import { getPoolById } from "#src/db-utils.js";
 
 export async function fetchData(config) {
@@ -38,8 +38,8 @@ export async function fetchData(config) {
   }
   console.log("Fetched trades.");
 
-  console.log("Calculating realized volatility...");
-  await rollingRealizedVolatility(config.poolId, startDate, endDate);
+  /*console.log("Calculating realized volatility...");
+  await rollingRealizedVolatility(config.poolId, startDate, endDate);*/
 }
 
 // Start the main function

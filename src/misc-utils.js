@@ -22,3 +22,6 @@ export const handle = (func, errStr) => {
 
 export const padDateMS = (pad, date) =>
   new Date(new Date(date).getTime() + pad);
+
+export const incPercent = (n, p) => n + (n * p) / 100;
+export const decPercent = (n, p) => n - (n * p) / 100;

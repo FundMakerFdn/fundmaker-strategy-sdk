@@ -10,7 +10,7 @@ import {
 } from "./pool-math.js";
 import { getPrices, getPoolMetadata, getAllTrades } from "./db-utils.js";
 import bn from "bignumber.js";
-import { mm } from "./misc-utils.js";
+import { incPercent, decPercent, mm } from "./misc-utils.js";
 
 async function getDecodedPrices(pool, timestamp) {
   const prices = await getPrices(pool.id, timestamp);
@@ -28,9 +28,35 @@ function printPosition(pool, [amount0, amount1]) {
   log(`Position ${pool.token1Symbol}: ${amount1}`);
 }
 
+function calculatePriceRange(currentPrice, pos) {
+  let price = {};
+  if (pos.fullRange) {
+    price = {
+      high: PRICE_MAX,
+      low: PRICE_MIN,
+    };
+  } else {
+    price = {
+      high: incPercent(currentPrice, pos.priceRange.uptickPercent),
+      low: decPercent(currentPrice, pos.priceRange.downtickPercent),
+    };
+  }
+  let rebalance = { high: PRICE_MAX, low: PRICE_MIN };
+  if (pos.rebalance) {
+    rebalance = {
+      high: incPercent(currentPrice, pos.rebalance.uptickPercent),
+      low: decPercent(currentPrice, pos.rebalance.downtickPercent),
+    };
+  }
+  return {
+    price,
+    rebalance,
+  };
+}
+
 export async function simulatePosition(position) {
   if (!position.amountUSD) position.amountUSD = CONFIG.DEFAULT_POS_USD;
-  const p = position.invPrices ? (p) => 1 / p : (p) => p;
+  const p = true ? (p) => 1 / p : (p) => p;
   let pool, open, close;
 
   try {
@@ -43,23 +69,25 @@ export async function simulatePosition(position) {
     return;
   }
 
-  const priceHigh = position.fullRange
-    ? PRICE_MAX
-    : open.price + (open.price * position.uptickPercent) / 100;
-  const priceLow = position.fullRange
-    ? PRICE_MIN
-    : open.price - (open.price * position.downtickPercent) / 100;
+  let currentRange = calculatePriceRange(open.price, position);
 
   log("Position value (USD):", position.amountUSD);
   log("Entry price:", p(open.price));
-  log("Price low, high:", ...mm(p(priceHigh), p(priceLow)));
+  log(
+    "Price low, high:",
+    ...mm(p(currentRange.price.high), p(currentRange.price.low))
+  );
+  log(
+    "Rebalance low, high:",
+    ...mm(p(currentRange.rebalance.low), p(currentRange.rebalance.high))
+  );
   log("Token prices at open:", open.price0, open.price1);
 
   // Calculate initial position
   let pos = getTokensAmountFromDepositAmountUSD(
     open.price,
-    priceLow,
-    priceHigh,
+    currentRange.price.low,
+    currentRange.price.high,
     open.price0,
     open.price1,
     position.amountUSD
@@ -76,7 +104,7 @@ export async function simulatePosition(position) {
   let future = { ...pos };
 
   // Track whether the price is within the range
-  let inRange = true;
+  let inPriceRange = true;
 
   for (const trade of trades) {
     const volumeUSD = new bn(trade.amountUSD);
@@ -84,23 +112,36 @@ export async function simulatePosition(position) {
 
     // Calculate the pos trade price
     const tradePrice = decodePrice(trade.sqrtPriceX96, pool);
-    // Check if the price is within the defined range
-    if (tradePrice < priceLow || tradePrice > priceHigh) {
-      if (inRange) {
+
+    if (position.rebalance) {
+      if (
+        tradePrice < currentRange.rebalance.low ||
+        tradePrice > currentRange.rebalance.high
+      ) {
+        log("REBALANCING", currentRange, tradePrice);
+        currentRange = calculatePriceRange(tradePrice, position);
+        inPriceRange = false; // to trigger deltaL recalculation
+      }
+    }
+    if (
+      tradePrice < currentRange.price.low ||
+      tradePrice > currentRange.price.high
+    ) {
+      if (inPriceRange) {
         // If the price leaves the range, freeze the token amounts
         log("OUT OF RANGE:", tradePrice, future.amount0, future.amount1);
-        inRange = false;
+        inPriceRange = false;
       }
     } else {
-      if (!inRange) {
+      if (!inPriceRange) {
         log("IN RANGE:", tradePrice, future.amount0, future.amount1);
-        inRange = true;
+        inPriceRange = true;
       }
 
       const deltaL = getLiquidityDelta(
         tradePrice,
-        priceLow,
-        priceHigh,
+        currentRange.price.low,
+        currentRange.price.high,
         pos.amount0,
         pos.amount1,
         pool.token0Decimals,
@@ -128,7 +169,7 @@ export async function simulatePosition(position) {
 
   const { totalValueB: newValueUSD, ILPercentage } = calculateIL(
     [close.price0, close.price1],
-    mm(1 / priceLow, 1 / priceHigh),
+    mm(1 / currentRange.price.low, 1 / currentRange.price.high),
     pos.liquidityDelta,
     pos.amount0,
     pos.amount1

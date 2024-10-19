@@ -4,8 +4,9 @@ import { program } from "commander";
 import { parse, format } from "fast-csv";
 import { simulatePosition } from "#src/simulate.js";
 import db from "#src/database.js";
-import { trades, volatility } from "#src/schema.js";
+import { trades } from "#src/schema.js";
 import { eq, and, gte } from "drizzle-orm";
+import { getHistIV } from "#src/db-utils.js";
 import {
   checkLiquidityIntegrity,
   getPoolById,
@@ -49,6 +50,10 @@ async function getLatestDatapoint(db, table, poolId, timestamp) {
   return result.length > 0 ? result[0] : null;
 }
 
+async function getLatestIV(timestamp) {
+  return await getHistIV("EVIV", timestamp);
+}
+
 async function executeStrategy(db, pool, startDate, endDate, strategy) {
   let positions = [];
   let currentDate = new Date(startDate);
@@ -84,18 +89,10 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 
         if (checkTime.getTime() > endDateTime) break;
 
-        const volatilityData = await getLatestDatapoint(
-          db,
-          volatility,
-          pool.id,
-          checkTime.getTime()
-        );
+        const ivData = await getLatestIV(checkTime.getTime());
 
-        if (
-          volatilityData &&
-          parseFloat(volatilityData.realizedVolatility) >
-            strategy.volatilityThreshold
-        ) {
+        if (ivData && parseFloat(ivData) > strategy.volatilityThreshold) {
+          console.log("Entering position, IV:", ivData);
           const tradeData = await getLatestDatapoint(
             db,
             trades,
@@ -139,10 +136,11 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       poolAddress: pool.address,
       openTime: new Date(position.openTimestamp),
       closeTime: new Date(position.closeTimestamp),
-      uptickPercent: strategy?.priceRange?.uptickPercent,
-      downtickPercent: strategy?.priceRange?.downtickPercent,
+      priceRange: strategy?.priceRange,
+      rebalance: strategy?.rebalance,
       fullRange: strategy?.priceRange?.fullRange,
       amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
+      positionOpenDays: strategy.positionOpenDays,
     });
     console.log("Closed position with PnL (%):", pnlPercent);
     position.pnlPercent = pnlPercent;
