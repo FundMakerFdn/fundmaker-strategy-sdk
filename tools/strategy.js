@@ -68,7 +68,7 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 
       if (closeCheckTime.getTime() > endDateTime) break;
 
-      openPositions = openPositions.filter(position => {
+      openPositions = openPositions.filter((position) => {
         const positionAge = closeCheckTime.getTime() - position.openTimestamp;
         const maxPositionAge = strategy.positionOpenDays * 24 * 60 * 60 * 1000;
 
@@ -87,6 +87,19 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       checkTime.setUTCHours(hour, 0, 0, 0);
 
       if (checkTime.getTime() > endDateTime) break;
+
+      // Check if we should open a new position based on onePosPerPool
+      if (strategy.onePosPerPool && openPositions.length > 0) {
+        const lastOpenPosition = openPositions[openPositions.length - 1];
+        const timeSinceLastOpen =
+          checkTime.getTime() - lastOpenPosition.openTimestamp;
+        const maxPositionAge = strategy.positionOpenDays * 24 * 60 * 60 * 1000;
+
+        if (timeSinceLastOpen < maxPositionAge) {
+          //console.log("Skipping new position due to onePosPerPool strategy");
+          continue;
+        }
+      }
 
       const ivData = await getLatestIV(checkTime.getTime());
 
