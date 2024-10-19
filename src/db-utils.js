@@ -271,20 +271,20 @@ export const getPoolById = handle(async (poolId) => {
 }, "getting pool by id");
 
 export const getFirstSpotPrice = handle(async (symbol, timestamp) => {
+  const targetTimestamp = new Date(timestamp).getTime();
   const result = await db
     .select()
     .from(spot)
-    .where(
-      and(
-        eq(spot.symbol, symbol),
-        lte(spot.timestamp, new Date(timestamp).getTime())
-      )
-    )
+    .where(and(eq(spot.symbol, symbol), lte(spot.timestamp, targetTimestamp)))
     .orderBy(desc(spot.timestamp))
     .limit(1)
     .execute();
 
-  return result.length > 0 ? result[0].close : null;
+  if (result.length > 0) {
+    const timeDiff = Math.abs(targetTimestamp - result[0].timestamp);
+    return timeDiff <= CONFIG.MAX_SPOT_TIMEDIST ? result[0].close : null;
+  }
+  return null;
 }, "getting first spot price");
 
 export const getHistIV = handle(async (symbol, timestamp) => {

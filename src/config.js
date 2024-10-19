@@ -44,6 +44,9 @@ const CONFIG = {
     ETHUSDT: 50,
     BTCUSDT: 500,
   },
+
+  // Maximum allowable time difference for spot price in milliseconds
+  MAX_SPOT_TIMEDIST: 2 * 60 * 60 * 1000, // 2 hours
 };
 
 /*CONFIG.position = {
