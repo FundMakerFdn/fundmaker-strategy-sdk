@@ -174,6 +174,7 @@ async function processData(data, strategy) {
             strategy.options.find((o) => o.optionType === option.optionType)
               .askBidRatio;
           const optionPnl = endBidPrice - option.start.askPremium;
+          const pnlPercent = ((endBidPrice / option.start.askPremium) - 1) * 100;
           pnlOptions += optionPnl;
 
           const endGreeks = calculateGreeks(
@@ -196,6 +197,7 @@ async function processData(data, strategy) {
               ...endGreeks,
             },
             optionPnl,
+            pnlPercent,
           };
         })
       );
