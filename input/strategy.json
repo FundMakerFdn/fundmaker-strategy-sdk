@@ -2,7 +2,7 @@
   {
     "strategyName": "ExampleStrat",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 68,
+    "volatilityThreshold": 67,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {

@@ -58,7 +58,7 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
   let positions = [];
   let currentDate = new Date(startDate);
   const endDateTime = new Date(endDate).getTime();
-  let openPosition = null;
+  let openPositions = [];
 
   while (currentDate.getTime() <= endDateTime) {
     // Check for position closure first
@@ -68,53 +68,51 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 
       if (closeCheckTime.getTime() > endDateTime) break;
 
-      if (openPosition) {
-        const positionAge =
-          closeCheckTime.getTime() - openPosition.openTimestamp;
+      openPositions = openPositions.filter(position => {
+        const positionAge = closeCheckTime.getTime() - position.openTimestamp;
         const maxPositionAge = strategy.positionOpenDays * 24 * 60 * 60 * 1000;
 
         if (positionAge >= maxPositionAge) {
-          openPosition.closeTimestamp = closeCheckTime.getTime();
-          positions.push(openPosition);
-          openPosition = null;
+          position.closeTimestamp = closeCheckTime.getTime();
+          positions.push(position);
+          return false;
         }
-      }
+        return true;
+      });
     }
 
-    // Check for opening new position
-    if (!openPosition) {
-      for (const hour of strategy.hoursCheckOpen) {
-        const checkTime = new Date(currentDate);
-        checkTime.setUTCHours(hour, 0, 0, 0);
+    // Check for opening new positions
+    for (const hour of strategy.hoursCheckOpen) {
+      const checkTime = new Date(currentDate);
+      checkTime.setUTCHours(hour, 0, 0, 0);
 
-        if (checkTime.getTime() > endDateTime) break;
+      if (checkTime.getTime() > endDateTime) break;
 
-        const ivData = await getLatestIV(checkTime.getTime());
+      const ivData = await getLatestIV(checkTime.getTime());
 
-        if (ivData && parseFloat(ivData) > strategy.volatilityThreshold) {
-          console.log("Entering position, IV:", ivData);
-          const tradeData = await getLatestDatapoint(
-            db,
-            trades,
-            pool.id,
-            checkTime.getTime()
+      if (ivData && parseFloat(ivData) > strategy.volatilityThreshold) {
+        console.log("Entering position, IV:", ivData);
+        const tradeData = await getLatestDatapoint(
+          db,
+          trades,
+          pool.id,
+          checkTime.getTime()
+        );
+
+        if (tradeData) {
+          const openPrice = parseFloat(
+            decodePrice(tradeData.sqrtPriceX96, pool)
           );
-
-          if (tradeData) {
-            const openPrice = parseFloat(
-              decodePrice(tradeData.sqrtPriceX96, pool)
-            );
-            openPosition = {
-              openTimestamp: checkTime.getTime(),
-              openPrice: openPrice,
-              targetUptickPrice:
-                openPrice * (1 + strategy.priceRange.uptickPercent / 100),
-              targetDowntickPrice:
-                openPrice * (1 - strategy.priceRange.downtickPercent / 100),
-              closeTimestamp: null,
-            };
-            break; // Exit the loop after opening a position
-          }
+          const newPosition = {
+            openTimestamp: checkTime.getTime(),
+            openPrice: openPrice,
+            targetUptickPrice:
+              openPrice * (1 + strategy.priceRange.uptickPercent / 100),
+            targetDowntickPrice:
+              openPrice * (1 - strategy.priceRange.downtickPercent / 100),
+            closeTimestamp: null,
+          };
+          openPositions.push(newPosition);
         }
       }
     }
@@ -122,10 +120,10 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
     currentDate.setUTCDate(currentDate.getDate() + 1);
   }
 
-  // Close any remaining open position
-  if (openPosition) {
-    openPosition.closeTimestamp = endDateTime;
-    positions.push(openPosition);
+  // Close any remaining open positions
+  for (let position of openPositions) {
+    position.closeTimestamp = endDateTime;
+    positions.push(position);
   }
 
   let positionsSim = [];

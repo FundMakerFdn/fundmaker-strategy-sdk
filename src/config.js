@@ -27,7 +27,7 @@ const CONFIG = {
   // Default simulation position size
   DEFAULT_POS_USD: 100,
 
-  VERBOSE: true,
+  VERBOSE: false,
 
   // Constants for fetch-spot
   SPOT_API_URL: "https://api.binance.com/api/v3/klines",
