@@ -68,7 +68,7 @@ async function processData(data, strategy) {
           const indexIV = await getHistIV("EVIV", record.openTimestamp);
 
           if (!spotPrice || !indexIV) {
-            log(
+            console.log(
               `Missing data for option ${index + 1}: ${JSON.stringify(option)}`
             );
             return null;
@@ -158,7 +158,10 @@ async function processData(data, strategy) {
           // Calculate remaining time to expiry
           const closeDate = new Date(record.closeTimestamp);
           const expirationDate = new Date(option.expirationDate);
-          const remainingT = Math.max(0, (expirationDate - closeDate) / (1000 * 60 * 60 * 24 * 365));
+          const remainingT = Math.max(
+            0,
+            (expirationDate - closeDate) / (1000 * 60 * 60 * 24 * 365)
+          );
 
           const endPrice = blackScholes(
             endSpotPrice,
@@ -174,7 +177,7 @@ async function processData(data, strategy) {
             strategy.options.find((o) => o.optionType === option.optionType)
               .askBidRatio;
           const optionPnl = endBidPrice - option.start.askPremium;
-          const pnlPercent = ((endBidPrice / option.start.askPremium) - 1) * 100;
+          const pnlPercent = (endBidPrice / option.start.askPremium - 1) * 100;
           pnlOptions += optionPnl;
 
           const endGreeks = calculateGreeks(
@@ -202,7 +205,9 @@ async function processData(data, strategy) {
         })
       );
 
-      const pnlCombined = parseFloat(record.pnlPercent) + updatedOptions.reduce((sum, option) => sum + option.pnlPercent, 0);
+      const pnlCombined =
+        parseFloat(record.pnlPercent) +
+        updatedOptions.reduce((sum, option) => sum + option.pnlPercent, 0);
 
       fileResults.push({
         ...record,
