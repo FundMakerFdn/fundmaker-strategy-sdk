@@ -28,6 +28,14 @@ function printPosition(pool, [amount0, amount1]) {
   log(`Position ${pool.token1Symbol}: ${amount1}`);
 }
 
+function calcPrices(trade) {
+  return {
+    ...trade,
+    price0: Math.abs(+trade.amountUSD / +trade.amount0),
+    price1: Math.abs(+trade.amountUSD / +trade.amount1),
+  };
+}
+
 function calculatePriceRange(currentPrice, pos) {
   let price = {};
   if (pos.fullRange) {
@@ -66,7 +74,7 @@ export async function simulatePosition(position) {
   } catch (err) {
     console.error("Failed to read local DB, please fetch the data");
     log(err);
-    return;
+    return null;
   }
 
   let currentRange = calculatePriceRange(open.price, position);
@@ -100,18 +108,35 @@ export async function simulatePosition(position) {
   const trades = getAllTrades(pool.id, position.openTime, position.closeTime);
   log(`Simulating ${trades.length} trades...`);
 
-  let feesCollected = 0;
-  let future = { ...pos };
+  let positions = [];
+  let currentPosition = {
+    poolType: position.poolType,
+    poolAddress: position.poolAddress,
+    openTimestamp: position.openTime.getTime(),
+    openPrice: open.price,
+    amountUSD: position.amountUSD,
+    feesCollected: 0,
+  };
 
-  // Track whether the price is within the range
   let inPriceRange = true;
+  let lastTradeTimestamp = 0;
 
-  for (const trade of trades) {
+  for (let trade of trades) {
+    if (trade.timestamp >= position.closeTime.getTime()) {
+      break; // Stop if we've reached or passed the strategy end timestamp
+    }
+
+    trade = calcPrices(trade);
     const volumeUSD = new bn(trade.amountUSD);
     if (!trade.amount0 || !trade.amount1) continue;
 
-    // Calculate the pos trade price
     const tradePrice = decodePrice(trade.sqrtPriceX96, pool);
+
+    // Prevent creating positions with the same timestamp
+    if (trade.timestamp <= lastTradeTimestamp) {
+      continue;
+    }
+    lastTradeTimestamp = trade.timestamp;
 
     if (position.rebalance) {
       if (
@@ -119,22 +144,55 @@ export async function simulatePosition(position) {
         tradePrice > currentRange.rebalance.high
       ) {
         log("REBALANCING", currentRange, tradePrice);
+
+        // Close current position
+        currentPosition.closeTimestamp = trade.timestamp;
+        currentPosition.closePrice = tradePrice;
+        const { totalValueB: newValueUSD, ILPercentage } = calculateIL(
+          [trade.price0, trade.price1],
+          mm(1 / currentRange.price.low, 1 / currentRange.price.high),
+          pos.liquidityDelta,
+          pos.amount0,
+          pos.amount1
+        );
+        currentPosition.ILPercentage = ILPercentage;
+        currentPosition.pnlPercent =
+          (newValueUSD / currentPosition.amountUSD - 1) * 100;
+        positions.push(currentPosition);
+
+        // Open new position
         currentRange = calculatePriceRange(tradePrice, position);
-        inPriceRange = false; // to trigger deltaL recalculation
+        pos = getTokensAmountFromDepositAmountUSD(
+          tradePrice,
+          currentRange.price.low,
+          currentRange.price.high,
+          trade.price0,
+          trade.price1,
+          position.amountUSD
+        );
+        currentPosition = {
+          poolType: position.poolType,
+          poolAddress: position.poolAddress,
+          openTimestamp: trade.timestamp,
+          openPrice: tradePrice,
+          amountUSD: position.amountUSD,
+          feesCollected: 0,
+        };
+        inPriceRange = true;
       }
     }
+
     if (
       tradePrice < currentRange.price.low ||
       tradePrice > currentRange.price.high
     ) {
       if (inPriceRange) {
-        // If the price leaves the range, freeze the token amounts
-        log("OUT OF RANGE:", tradePrice, future.amount0, future.amount1);
+        log("OUT OF RANGE:", tradePrice, pos.amount0, pos.amount1);
         inPriceRange = false;
       }
     } else {
       if (!inPriceRange) {
-        log("IN RANGE:", tradePrice, future.amount0, future.amount1);
+        log("IN RANGE:", tradePrice, pos.amount0, pos.amount1);
         inPriceRange = true;
       }
 
@@ -155,35 +213,44 @@ export async function simulatePosition(position) {
         trade.current_feeTier || pool.feeTier
       );
 
-      if (isNaN(fee)) continue;
-
-      feesCollected += fee;
+      if (!isNaN(fee)) {
+        currentPosition.feesCollected += fee;
+      }
     }
   }
 
+  // Close the last position if it's still open
+  if (currentPosition.closeTimestamp === undefined) {
+    currentPosition.closeTimestamp = position.closeTime.getTime();
+    currentPosition.closePrice = close.price;
+    const { totalValueB: newValueUSD, ILPercentage } = calculateIL(
+      [close.price0, close.price1],
+      mm(1 / currentRange.price.low, 1 / currentRange.price.high),
+      pos.liquidityDelta,
+      pos.amount0,
+      pos.amount1
+    );
+    currentPosition.ILPercentage = ILPercentage;
+    currentPosition.pnlPercent =
+      (newValueUSD / currentPosition.amountUSD - 1) * 100;
+    positions.push(currentPosition);
+  }
+
   if (CONFIG.SHOW_SIMULATION_PROGRESS) log("");
-  log("Fees collected by position (USD):", feesCollected);
+  log("Positions:", positions.length);
+  positions.forEach((pos, index) => {
+    log(`Position ${index + 1}:`);
+    log("  Open timestamp:", new Date(pos.openTimestamp).toISOString());
+    log("  Close timestamp:", new Date(pos.closeTimestamp).toISOString());
+    log("  Open price:", pos.openPrice);
+    log("  Close price:", pos.closePrice);
+    log("  Fees collected (USD):", pos.feesCollected);
+    log("  IL (%):", pos.ILPercentage);
+    log("  PnL (%):", pos.pnlPercent);
+    log("-------------------");
+  });
 
-  log("Exit price:", p(close.price));
-  log("Token prices at close:", close.price0, close.price1);
-
-  const { totalValueB: newValueUSD, ILPercentage } = calculateIL(
-    [close.price0, close.price1],
-    mm(1 / currentRange.price.low, 1 / currentRange.price.high),
-    pos.liquidityDelta,
-    pos.amount0,
-    pos.amount1
-  );
-  log("IL (%):", ILPercentage);
-  log("Position value (USD):", newValueUSD);
-
-  const totalPnL = newValueUSD - position.amountUSD;
-  const totalPnLPercent = (newValueUSD / position.amountUSD - 1) * 100;
-  log("Total PnL (USD):", totalPnL);
-  log("Total PnL (%):", totalPnLPercent);
-  log("-------------------");
-
-  return totalPnLPercent;
+  return positions;
 }
 
 //simulatePosition(CONFIG.position);

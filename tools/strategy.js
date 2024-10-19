@@ -130,8 +130,8 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 
   let positionsSim = [];
   for (let position of positions) {
-    // Simulate PnL percentage using simulatePosition
-    const pnlPercent = await simulatePosition({
+    // Simulate position using simulatePosition
+    const simulationResults = await simulatePosition({
       poolType: pool.type,
       poolAddress: pool.address,
       openTime: new Date(position.openTimestamp),
@@ -142,9 +142,11 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
       positionOpenDays: strategy.positionOpenDays,
     });
-    console.log("Closed position with PnL (%):", pnlPercent);
-    position.pnlPercent = pnlPercent;
-    positionsSim.push(position);
+
+    if (simulationResults) {
+      console.log(`Simulated ${simulationResults.length} positions`);
+      positionsSim.push(...simulationResults);
+    }
   }
 
   return positionsSim;
@@ -179,13 +181,15 @@ async function writeOutputCSV(results, outputDir) {
 
     positions.forEach((position) => {
       csvStream.write({
-        poolType: poolType,
-        poolId: pool.id,
+        poolType: position.poolType,
+        poolAddress: position.poolAddress,
         openTimestamp: new Date(position.openTimestamp).toISOString(),
         closeTimestamp: new Date(position.closeTimestamp).toISOString(),
         openPrice: position.openPrice,
-        targetUptickPrice: position.targetUptickPrice || PRICE_MAX,
-        targetDowntickPrice: position.targetDowntickPrice || PRICE_MIN,
+        closePrice: position.closePrice,
+        amountUSD: position.amountUSD,
+        feesCollected: position.feesCollected,
+        ILPercentage: position.ILPercentage,
         pnlPercent: position.pnlPercent,
       });
     });
@@ -256,6 +260,7 @@ async function main(opts) {
     console.log(
       `Strategy: ${result.strategyName}, Pool: ${result.poolAddress}`
     );
+    console.log("Total positions:", result.positions.length);
     console.log("Average PnL %:", result.avgPnL);
     console.log("Sharpe ratio:", result.sharpe);
     console.log("---");

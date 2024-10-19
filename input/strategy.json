@@ -2,16 +2,16 @@
   {
     "strategyName": "ExampleStrat",
     "hoursCheckOpen": [11, 21],
-    "volatilityThreshold": 66,
+    "volatilityThreshold": 68,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
     "priceRange": {
-      "uptickPercent": 4,
-      "downtickPercent": 4
+      "uptickPercent": 5,
+      "downtickPercent": 5
     },
     "rebalance": {
       "uptickPercent": 2,
-      "downtickPercent": 2
+      "downtickPercent": 3
     },
     "options": [
       {
