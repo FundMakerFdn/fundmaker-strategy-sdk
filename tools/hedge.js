@@ -118,14 +118,16 @@ async function processData(data, strategy) {
           return {
             optionType: option.optionType,
             strikePrice,
-            spotPrice,
             spotSymbol,
-            askPremium: price,
-            bidPremium: bidPrice,
-            askIV,
-            indexIV,
             expirationDate: expirationDate.toISOString(),
-            ...greeks,
+            start: {
+              spotPrice,
+              askPremium: price,
+              bidPremium: bidPrice,
+              askIV,
+              indexIV,
+              ...greeks,
+            },
           };
         })
       );
@@ -153,10 +155,15 @@ async function processData(data, strategy) {
             strategy.options.find((o) => o.optionType === option.optionType)
               .askIndexIVRatio;
 
+          // Calculate remaining time to expiry
+          const closeDate = new Date(record.closeTimestamp);
+          const expirationDate = new Date(option.expirationDate);
+          const remainingT = Math.max(0, (expirationDate - closeDate) / (1000 * 60 * 60 * 24 * 365));
+
           const endPrice = blackScholes(
             endSpotPrice,
             option.strikePrice,
-            0.00001, // Very small time to expiry
+            remainingT,
             strategy.riskFreeRate,
             endAskIV,
             option.optionType
@@ -166,12 +173,28 @@ async function processData(data, strategy) {
             endPrice /
             strategy.options.find((o) => o.optionType === option.optionType)
               .askBidRatio;
-          const optionPnl = endBidPrice - option.askPremium;
+          const optionPnl = endBidPrice - option.start.askPremium;
           pnlOptions += optionPnl;
+
+          const endGreeks = calculateGreeks(
+            endSpotPrice,
+            option.strikePrice,
+            remainingT,
+            strategy.riskFreeRate,
+            endAskIV,
+            option.optionType
+          );
 
           return {
             ...option,
-            endBidPrice,
+            end: {
+              spotPrice: endSpotPrice,
+              askPremium: endPrice,
+              bidPremium: endBidPrice,
+              askIV: endAskIV,
+              indexIV: endIndexIV,
+              ...endGreeks,
+            },
             optionPnl,
           };
         })

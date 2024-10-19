@@ -13,17 +13,17 @@
         "optionType": "call",
         "strikePrice": 1,
         "spotSymbol": "ETHUSDT",
-        "askBidRatio": 1.1,
-        "askIndexIVRatio": 0.56,
-        "dte": 7
+        "askBidRatio": 1.028,
+        "askIndexIVRatio": 1.09,
+        "dte": 365
       },
       {
         "optionType": "put",
         "strikePrice": 1,
         "spotSymbol": "ETHUSDT",
-        "askBidRatio": 1.1,
-        "askIndexIVRatio": 0.56,
-        "dte": 7
+        "askBidRatio": 1.028,
+        "askIndexIVRatio": 1.09,
+        "dte": 365
       }
     ],
     "riskFreeRate": 0.03
