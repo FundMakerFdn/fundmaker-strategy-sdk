@@ -202,7 +202,7 @@ async function processData(data, strategy) {
         })
       );
 
-      const pnlCombined = parseFloat(record.pnlPercent) + pnlOptions;
+      const pnlCombined = parseFloat(record.pnlPercent) + updatedOptions.reduce((sum, option) => sum + option.pnlPercent, 0);
 
       fileResults.push({
         ...record,
