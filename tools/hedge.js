@@ -45,11 +45,11 @@ async function processData(data, strategy) {
 
     for (const record of records) {
       log(`Processing record: ${JSON.stringify(record)}`);
-      const pnlPercent = parseFloat(record.pnlPercent);
+      const pnlPercentLP = parseFloat(record.pnlPercent);
       // DTE calculation is now handled per option
       const pool = await getPoolById(record.poolId);
 
-      log(`PNL Percent: ${pnlPercent}`);
+      log(`PNL Percent LP: ${pnlPercentLP}%`);
 
       const optionResults = await Promise.all(
         strategy.options.map(async (option, index) => {
@@ -121,11 +121,11 @@ async function processData(data, strategy) {
             spotSymbol,
             expirationDate: expirationDate.toISOString(),
             start: {
-              spotPrice,
-              askPremium: price,
-              bidPremium: bidPrice,
-              askIV,
-              indexIV,
+              spotPriceUSD: spotPrice,
+              askPremiumUSD: price,
+              bidPremiumUSD: bidPrice,
+              askIVPercent: askIV,
+              indexIVPercent: indexIV,
               ...greeks,
             },
           };
@@ -141,8 +141,8 @@ async function processData(data, strategy) {
         continue;
       }
 
-      // Calculate pnlOptions and pnlCombined
-      let pnlOptions = 0;
+      // Calculate pnlOptions and pnlTotal
+      let pnlOptionsUSD = 0;
       const updatedOptions = await Promise.all(
         validOptionResults.map(async (option) => {
           const endSpotPrice = await getFirstSpotPrice(
@@ -176,9 +176,10 @@ async function processData(data, strategy) {
             endPrice /
             strategy.options.find((o) => o.optionType === option.optionType)
               .askBidRatio;
-          const optionPnl = endBidPrice - option.start.askPremium;
-          const pnlPercent = (endBidPrice / option.start.askPremium - 1) * 100;
-          pnlOptions += optionPnl;
+          const optionPnlUSD = endBidPrice - option.start.askPremiumUSD;
+          const optionPnlPercent =
+            (endBidPrice / option.start.askPremiumUSD - 1) * 100;
+          pnlOptionsUSD += optionPnlUSD;
 
           const endGreeks = calculateGreeks(
             endSpotPrice,
@@ -192,28 +193,33 @@ async function processData(data, strategy) {
           return {
             ...option,
             end: {
-              spotPrice: endSpotPrice,
-              askPremium: endPrice,
-              bidPremium: endBidPrice,
-              askIV: endAskIV,
-              indexIV: endIndexIV,
+              spotPriceUSD: endSpotPrice,
+              askPremiumUSD: endPrice,
+              bidPremiumUSD: endBidPrice,
+              askIVPercent: endAskIV,
+              indexIVPercent: endIndexIV,
               ...endGreeks,
             },
-            optionPnl,
-            pnlPercent,
+            optionPnlUSD,
+            optionPnlPercent,
           };
         })
       );
 
-      const pnlCombined =
-        parseFloat(record.pnlPercent) +
-        updatedOptions.reduce((sum, option) => sum + option.pnlPercent, 0);
+      const pnlOptionsPercent = updatedOptions.reduce(
+        (sum, option) => sum + option.optionPnlPercent,
+        0
+      );
+      const pnlTotalPercent = pnlPercentLP + pnlOptionsPercent;
 
+      delete record.pnlPercent;
       fileResults.push({
         ...record,
         options: updatedOptions,
-        pnlOptions,
-        pnlCombined,
+        pnlPercentLP,
+        pnlOptionsUSD,
+        pnlOptionsPercent,
+        pnlTotalPercent,
       });
     }
 
