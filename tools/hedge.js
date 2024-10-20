@@ -145,19 +145,25 @@ async function processData(data, strategy) {
       let pnlOptionsUSD = 0;
       const updatedOptions = await Promise.all(
         validOptionResults.map(async (option) => {
+          const closeDate = new Date(record.closeTimestamp);
+          const expirationDate = new Date(option.expirationDate);
+          const isExpired = closeDate >= expirationDate;
+
+          // Use expiration date for spot price and IV if option has expired
+          const endTimestamp = isExpired
+            ? option.expirationDate
+            : record.closeTimestamp;
           const endSpotPrice = await getFirstSpotPrice(
             option.spotSymbol,
-            record.closeTimestamp
+            endTimestamp
           );
-          const endIndexIV = await getHistIV("EVIV", record.closeTimestamp);
+          const endIndexIV = await getHistIV("EVIV", endTimestamp);
           const endAskIV =
             endIndexIV *
             strategy.options.find((o) => o.optionType === option.optionType)
               .askIndexIVRatio;
 
           // Calculate remaining time to expiry
-          const closeDate = new Date(record.closeTimestamp);
-          const expirationDate = new Date(option.expirationDate);
           const remainingT = Math.max(
             0,
             (expirationDate - closeDate) / (1000 * 60 * 60 * 24 * 365)
@@ -171,16 +177,10 @@ async function processData(data, strategy) {
             endAskIV,
             option.optionType
           );
-
           const endBidPrice =
             endPrice /
             strategy.options.find((o) => o.optionType === option.optionType)
               .askBidRatio;
-          const optionPnlUSD = endBidPrice - option.start.askPremiumUSD;
-          const optionPnlPercent =
-            (endBidPrice / option.start.askPremiumUSD - 1) * 100;
-          pnlOptionsUSD += optionPnlUSD;
-
           const endGreeks = calculateGreeks(
             endSpotPrice,
             option.strikePrice,
@@ -189,6 +189,11 @@ async function processData(data, strategy) {
             endAskIV,
             option.optionType
           );
+
+          const optionPnlUSD = endBidPrice - option.start.askPremiumUSD;
+          const optionPnlPercent =
+            (endBidPrice / option.start.askPremiumUSD - 1) * 100;
+          pnlOptionsUSD += optionPnlUSD;
 
           return {
             ...option,
@@ -202,6 +207,7 @@ async function processData(data, strategy) {
             },
             optionPnlUSD,
             optionPnlPercent,
+            expired: isExpired,
           };
         })
       );

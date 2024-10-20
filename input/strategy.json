@@ -20,7 +20,7 @@
         "spotSymbol": "ETHUSDT",
         "askBidRatio": 1.028,
         "askIndexIVRatio": 1.09,
-        "dte": 365
+        "dte": 30
       },
       {
         "optionType": "put",
@@ -28,7 +28,7 @@
         "spotSymbol": "ETHUSDT",
         "askBidRatio": 1.028,
         "askIndexIVRatio": 1.09,
-        "dte": 365
+        "dte": 30
       }
     ],
     "riskFreeRate": 0.03
