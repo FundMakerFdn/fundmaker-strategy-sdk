@@ -220,6 +220,7 @@ async function main(opts) {
   for (const strategy of strategyJSON) {
     console.log(`Executing strategy "${strategy.strategyName}"`);
     for (const poolRow of poolsCSV) {
+      if (!poolRow.poolType) continue; // empty line
       console.log("Pool", poolRow.poolType, poolRow.poolAddress);
       const poolId = await fetchPool(poolRow.poolType, poolRow.poolAddress);
       const pool = await getPoolById(poolId);
