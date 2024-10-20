@@ -61,13 +61,13 @@ async function processData(data, strategy) {
           } else {
             spotSymbol = pool.type === "Thena_BSC" ? "BNBUSDT" : "ETHUSDT";
           }
-          const spotPrice = await getFirstSpotPrice(
+          const spotPriceUSD = await getFirstSpotPrice(
             spotSymbol,
             record.openTimestamp
           );
           const indexIV = await getHistIV("EVIV", record.openTimestamp);
 
-          if (!spotPrice || !indexIV) {
+          if (!spotPriceUSD || !indexIV) {
             console.log(
               `Missing data for option ${index + 1}: ${JSON.stringify(option)}`
             );
@@ -76,11 +76,11 @@ async function processData(data, strategy) {
 
           const stepSize = CONFIG.STRIKE_PRICE_STEPS[spotSymbol] || 1;
           const adjustedStrikeMultiplier = adjustStrikePrice(
-            spotPrice,
+            spotPriceUSD,
             option.strikePrice,
             stepSize
           );
-          const strikePrice = adjustedStrikeMultiplier * spotPrice;
+          const strikePrice = adjustedStrikeMultiplier * spotPriceUSD;
 
           const expirationDate = calculateExpirationDate(
             new Date(record.openTimestamp),
@@ -95,16 +95,19 @@ async function processData(data, strategy) {
           // Apply askIndexIVRatio to get the option's ask IV
           const askIV = indexIV * option.askIndexIVRatio;
 
-          const price = blackScholes(
-            spotPrice,
-            strikePrice,
-            T,
-            r,
-            askIV,
-            option.optionType
-          );
+          const price =
+            (blackScholes(
+              spotPriceUSD,
+              strikePrice,
+              T,
+              r,
+              askIV,
+              option.optionType
+            ) *
+              record.amountUSD) /
+            spotPriceUSD;
           const greeks = calculateGreeks(
-            spotPrice,
+            spotPriceUSD,
             strikePrice,
             T,
             r,
@@ -121,7 +124,7 @@ async function processData(data, strategy) {
             spotSymbol,
             expirationDate: expirationDate.toISOString(),
             start: {
-              spotPriceUSD: spotPrice,
+              spotPriceUSD: spotPriceUSD,
               askPremiumUSD: price,
               bidPremiumUSD: bidPrice,
               askIVPercent: askIV,
@@ -169,14 +172,17 @@ async function processData(data, strategy) {
             (expirationDate - closeDate) / (1000 * 60 * 60 * 24 * 365)
           );
 
-          const endPrice = blackScholes(
-            endSpotPrice,
-            option.strikePrice,
-            remainingT,
-            strategy.riskFreeRate,
-            endAskIV,
-            option.optionType
-          );
+          const endPrice =
+            (blackScholes(
+              endSpotPrice,
+              option.strikePrice,
+              remainingT,
+              strategy.riskFreeRate,
+              endAskIV,
+              option.optionType
+            ) *
+              record.amountUSD) /
+            endSpotPrice;
           const endBidPrice =
             endPrice /
             strategy.options.find((o) => o.optionType === option.optionType)
@@ -216,7 +222,7 @@ async function processData(data, strategy) {
         (sum, option) => sum + option.optionPnlPercent,
         0
       );
-      const pnlTotalPercent = pnlPercentLP + pnlOptionsPercent;
+      const pnlTotalPercent = pnlPercentLP + (pnlOptionsUSD / record.amountUSD) * 100;
 
       delete record.pnlPercent;
       fileResults.push({
