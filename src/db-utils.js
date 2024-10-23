@@ -287,6 +287,28 @@ export const getFirstSpotPrice = handle(async (symbol, timestamp) => {
   return null;
 }, "getting first spot price");
 
+export const filterFirstSpotPrice = handle(
+  async (price, isGreater, symbol, timestampFrom) => {
+    const targetTimestamp = new Date(timestampFrom).getTime();
+    const result = await db
+      .select()
+      .from(spot)
+      .where(
+        and(
+          eq(spot.symbol, symbol),
+          gte(spot.timestamp, targetTimestamp),
+          isGreater ? gte(spot.close, price) : lte(spot.close, price)
+        )
+      )
+      .orderBy(spot.timestamp)
+      .limit(1)
+      .execute();
+
+    return result.length > 0 ? result[0] : null;
+  },
+  "finding first spot price crossing"
+);
+
 export const getHistIV = handle(async (symbol, timestamp) => {
   const result = await db
     .select()

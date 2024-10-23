@@ -20,7 +20,10 @@
         "spotSymbol": "ETHUSDT",
         "askBidRatio": 1.028,
         "askIndexIVRatio": 1.09,
-        "dte": 30
+        "dte": 30,
+        "closeCondition": {
+          "uptickPercent": 1
+        }
       },
       {
         "optionType": "put",
@@ -28,7 +31,10 @@
         "spotSymbol": "ETHUSDT",
         "askBidRatio": 1.028,
         "askIndexIVRatio": 1.09,
-        "dte": 30
+        "dte": 30,
+        "closeCondition": {
+          "downtickPercent": 1
+        }
       }
     ],
     "riskFreeRate": 0.03

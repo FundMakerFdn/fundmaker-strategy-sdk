@@ -2,7 +2,12 @@ import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 import { program } from "commander";
-import { getFirstSpotPrice, getHistIV, getPoolById } from "#src/db-utils.js";
+import {
+  getFirstSpotPrice,
+  filterFirstSpotPrice,
+  getHistIV,
+  getPoolById,
+} from "#src/db-utils.js";
 import {
   blackScholes,
   calculateGreeks,
@@ -11,9 +16,9 @@ import {
 } from "#src/options-math.js";
 import CONFIG from "#src/config.js";
 
-function log(message) {
+function log(...message) {
   if (CONFIG.VERBOSE) {
-    console.log(message);
+    console.log(...message);
   }
 }
 
@@ -53,7 +58,7 @@ async function processData(data, strategy) {
 
       const optionResults = await Promise.all(
         strategy.options.map(async (option, index) => {
-          log(`Processing option ${index + 1}`);
+          // log(`Processing option ${index + 1}`);
 
           let spotSymbol;
           if (option.spotSymbol) {
@@ -148,14 +153,50 @@ async function processData(data, strategy) {
       let pnlOptionsUSD = 0;
       const updatedOptions = await Promise.all(
         validOptionResults.map(async (option) => {
-          const closeDate = new Date(record.closeTimestamp);
           const expirationDate = new Date(option.expirationDate);
-          const isExpired = closeDate >= expirationDate;
+          let endTimestamp = new Date(record.closeTimestamp);
+          let isExpired = false;
+
+          // Check for early close condition based on price movement
+          const strategyOption = strategy.options.find(
+            (o) => o.optionType === option.optionType
+          );
+          if (strategyOption.closeCondition) {
+            const { uptickPercent, downtickPercent } =
+              strategyOption.closeCondition;
+            const startSpot = option.start.spotPriceUSD;
+            const targetPrice = uptickPercent
+              ? startSpot * (1 + uptickPercent / 100)
+              : startSpot * (1 - downtickPercent / 100);
+
+            const crossingPoint = await filterFirstSpotPrice(
+              targetPrice,
+              !!uptickPercent,
+              option.spotSymbol,
+              record.openTimestamp
+            );
+
+            if (crossingPoint && crossingPoint.timestamp < endTimestamp) {
+              log(
+                `Triggered closeCondition for ${strategyOption.optionType} (open: ${startSpot}):`,
+                crossingPoint
+              );
+              endTimestamp = new Date(crossingPoint.timestamp);
+              option.closedByCondition = true;
+            } else {
+              option.closedByCondition = false;
+            }
+          } else {
+            option.closedByCondition = false;
+          }
+
+          // Check if expired
+          isExpired = endTimestamp >= expirationDate;
 
           // Use expiration date for spot price and IV if option has expired
-          const endTimestamp = isExpired
-            ? option.expirationDate
-            : record.closeTimestamp;
+          if (isExpired) {
+            endTimestamp = new Date(option.expirationDate);
+          }
           const endSpotPrice = await getFirstSpotPrice(
             option.spotSymbol,
             endTimestamp
@@ -169,7 +210,7 @@ async function processData(data, strategy) {
           // Calculate remaining time to expiry
           const remainingT = Math.max(
             0,
-            (expirationDate - closeDate) / (1000 * 60 * 60 * 24 * 365)
+            (expirationDate - endTimestamp) / (1000 * 60 * 60 * 24 * 365)
           );
 
           const endPrice =
@@ -214,6 +255,7 @@ async function processData(data, strategy) {
             optionPnlUSD,
             optionPnlPercent,
             expired: isExpired,
+            closeDate: endTimestamp.toISOString(),
           };
         })
       );
@@ -222,7 +264,8 @@ async function processData(data, strategy) {
         (sum, option) => sum + option.optionPnlPercent,
         0
       );
-      const pnlTotalPercent = pnlPercentLP + (pnlOptionsUSD / record.amountUSD) * 100;
+      const pnlTotalPercent =
+        pnlPercentLP + (pnlOptionsUSD / record.amountUSD) * 100;
 
       delete record.pnlPercent;
       fileResults.push({
