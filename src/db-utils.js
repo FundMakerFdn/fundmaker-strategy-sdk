@@ -339,3 +339,15 @@ export const getRealizedVolatility = handle(async (poolId, timestamp) => {
 
   return result.length > 0 ? result[0].realizedVolatility : null;
 }, "getting realized volatility");
+
+export const getLatestDatapoint = handle(async (table, poolId, timestamp) => {
+  const result = await db
+    .select()
+    .from(table)
+    .where(and(eq(table.pool_id, poolId), lte(table.timestamp, timestamp)))
+    .orderBy(desc(table.timestamp))
+    .limit(1)
+    .execute();
+
+  return result.length > 0 ? result[0] : null;
+}, "getting latest datapoint");

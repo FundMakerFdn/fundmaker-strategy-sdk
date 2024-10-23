@@ -11,6 +11,7 @@ import {
   checkLiquidityIntegrity,
   getPoolById,
   getPoolMetadata,
+  getLatestDatapoint,
 } from "#src/db-utils.js";
 import { fetchData } from "#src/fetcher.js";
 import CONFIG from "#src/config.js";
@@ -36,18 +37,6 @@ function parseCSV(filePath) {
         resolve(rowsCSV);
       });
   });
-}
-
-async function getLatestDatapoint(db, table, poolId, timestamp) {
-  const result = await db
-    .select()
-    .from(table)
-    .where(and(eq(table.pool_id, poolId), gte(table.timestamp, timestamp)))
-    .orderBy(table.timestamp, "asc")
-    .limit(1)
-    .execute();
-
-  return result.length > 0 ? result[0] : null;
 }
 
 async function getLatestIV(timestamp) {
@@ -106,7 +95,6 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       if (ivData && parseFloat(ivData) > strategy.volatilityThreshold) {
         console.log("Entering position, IV:", ivData);
         const tradeData = await getLatestDatapoint(
-          db,
           trades,
           pool.id,
           checkTime.getTime()
@@ -156,7 +144,7 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
 
     if (simulationResults) {
       console.log(`Simulated ${simulationResults.length} positions`);
-      positionsSim.push(...simulationResults);
+      positionsSim.push(simulationResults);
     }
   }
 
@@ -174,6 +162,7 @@ async function writeOutputCSV(results, outputDir) {
     const pool = await getPoolMetadata(poolType, poolAddress);
     const token0 = pool.token0Symbol;
     const token1 = pool.token1Symbol;
+    let positionId = 1;
 
     let increment = 1;
     let fileName;
@@ -190,19 +179,23 @@ async function writeOutputCSV(results, outputDir) {
 
     csvStream.pipe(writableStream);
 
-    positions.forEach((position) => {
-      csvStream.write({
-        poolType: position.poolType,
-        poolAddress: position.poolAddress,
-        openTimestamp: new Date(position.openTimestamp).toISOString(),
-        closeTimestamp: new Date(position.closeTimestamp).toISOString(),
-        openPrice: position.openPrice,
-        closePrice: position.closePrice,
-        amountUSD: position.amountUSD,
-        feesCollected: position.feesCollected,
-        ILPercentage: position.ILPercentage,
-        pnlPercent: position.pnlPercent,
+    positions.forEach((positionSet) => {
+      positionSet.forEach((position) => {
+        csvStream.write({
+          poolType: position.poolType,
+          poolAddress: position.poolAddress,
+          positionId: positionId,
+          openTimestamp: new Date(position.openTimestamp).toISOString(),
+          closeTimestamp: new Date(position.closeTimestamp).toISOString(),
+          openPrice: position.openPrice,
+          closePrice: position.closePrice,
+          amountUSD: position.amountUSD,
+          feesCollected: position.feesCollected,
+          ILPercentage: position.ILPercentage,
+          pnlPercent: position.pnlPercent,
+        });
       });
+      positionId++;
     });
 
     csvStream.end();
@@ -249,7 +242,7 @@ async function main(opts) {
         endDate,
         strategy
       );
-      const pnlArr = positions.map((p) => p.pnlPercent);
+      const pnlArr = positions.flat().map((p) => p.pnlPercent);
       const avgPnL = pnlArr.reduce((a, r) => a + r, 0) / pnlArr.length;
       const std = calculateStandardDeviation(pnlArr);
       const sharpe = std !== 0 ? avgPnL / std : 0;
