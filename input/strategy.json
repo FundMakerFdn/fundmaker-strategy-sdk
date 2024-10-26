@@ -5,6 +5,7 @@
     "volatilityThreshold": 67,
     "hoursCheckClose": [10],
     "positionOpenDays": 3,
+    "riskFreeRate": 0.03,
     "priceRange": {
       "uptickPercent": 5,
       "downtickPercent": 5
@@ -37,6 +38,19 @@
         }
       }
     ],
-    "riskFreeRate": 0.03
+    "trading": [
+      {
+        "positionType": "long",
+        "entryPricePercent": 0,
+        "takeProfitPercent": 5,
+        "stopLossPercent": -1
+      },
+      {
+        "positionType": "short",
+        "entryPricePercent": -1,
+        "takeProfitPercent": -2,
+        "stopLossPercent": 0
+      }
+    ]
   }
 ]

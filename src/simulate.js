@@ -62,7 +62,6 @@ function calculatePriceRange(currentPrice, pos) {
   };
 }
 
-
 export async function simulateLP(posConfig) {
   if (!posConfig.amountUSD) posConfig.amountUSD = CONFIG.DEFAULT_POS_USD;
   const p = true ? (p) => 1 / p : (p) => p;
@@ -111,6 +110,7 @@ export async function simulateLP(posConfig) {
 
   let positions = [];
   let currentPosition = {
+    lpPositionId: posConfig.lpPositionId,
     poolType: posConfig.poolType,
     poolAddress: posConfig.poolAddress,
     openTimestamp: posConfig.openTime.getTime(),
@@ -172,6 +172,7 @@ export async function simulateLP(posConfig) {
           posConfig.amountUSD
         );
         currentPosition = {
+          lpPositionId: posConfig.lpPositionId,
           poolType: posConfig.poolType,
           poolAddress: posConfig.poolAddress,
           openTimestamp: trade.timestamp,
@@ -237,22 +238,30 @@ export async function simulateLP(posConfig) {
     positions.push(currentPosition);
   }
 
-  // If trading is enabled in the strategy, simulate trading positions
-  if (posConfig.trading?.enabled) {
-    const tradingPositions = await simulateTrading(trades, posConfig, currentPosition, pool);
-    // Remove this line that concatenates the positions
-    // positions = positions.concat(tradingPositions);
-    
+  // If trading strategies are configured, simulate trading positions
+  if (
+    posConfig.trading &&
+    Array.isArray(posConfig.trading) &&
+    posConfig.trading.length > 0
+  ) {
+    const tradingPositions = await simulateTrading(
+      trades,
+      posConfig,
+      currentPosition,
+      pool,
+      posConfig.lpPositionId
+    );
+
     if (CONFIG.SHOW_SIMULATION_PROGRESS) log("");
     log("LP Positions:", positions.length);
     log("Trading Positions:", tradingPositions.length);
-    
+
     // Log positions separately
     positions.forEach((pos, index) => {
       log(`LP Position ${index + 1}:`);
       logLPPosition(pos);
     });
-    
+
     tradingPositions.forEach((pos, index) => {
       log(`Trading Position ${index + 1}:`);
       logTradingPosition(pos);
@@ -260,134 +269,165 @@ export async function simulateLP(posConfig) {
 
     return {
       lpPositions: positions,
-      tradingPositions
+      tradingPositions,
     };
   }
 
-  // If trading is not enabled, just return LP positions
+  // If no trading strategies configured, just return LP positions
   return {
     lpPositions: positions,
-    tradingPositions: []
+    tradingPositions: [],
   };
 }
 
 // Helper function to reduce code duplication
 function logLPPosition(pos) {
+  log("  LP Position ID:", pos.id);
   log("  Open timestamp:", new Date(pos.openTimestamp).toISOString());
   log("  Close timestamp:", new Date(pos.closeTimestamp).toISOString());
   log("  Price:", pos.openPrice || pos.price);
 
-    log("  Fees collected (USD):", pos.feesCollected);
-    log("  IL (%):", pos.ILPercentage);
-    log("  PnL (%):", pos.pnlPercent);
+  log("  Fees collected (USD):", pos.feesCollected);
+  log("  IL (%):", pos.ILPercentage);
+  log("  PnL (%):", pos.pnlPercent);
 
   log("-------------------");
 }
 
 //simulateLP(CONFIG.position);
 
-// Pure helper functions
-function calcTokenGains(initial, current) {
-  return {
-    token0Amount: current.token0Amount - initial.token0Amount,
-    token1Amount: current.token1Amount - initial.token1Amount
-  };
-}
-
-function calcPnLPercents(initial, current, prices) {
-  const initialUSD = initial.token0Amount * prices.price0 + initial.token1Amount * prices.price1;
-  const currentUSD = current.token0Amount * prices.price0 + current.token1Amount * prices.price1;
-
-  return {
-    pnlPercentToken0: initial.token0Amount ? ((current.token0Amount / initial.token0Amount) - 1) * 100 : 0,
-    pnlPercentToken1: initial.token1Amount ? ((current.token1Amount / initial.token1Amount) - 1) * 100 : 0, 
-    pnlPercentUSD: ((currentUSD / initialUSD) - 1) * 100
-  };
-}
-
-async function simulateTrading(trades, posConfig, initialPosition, pool) {
+async function simulateTrading(trades, posConfig, initialPosition, pool, lpPositionId) {
   const positions = [];
-  const tradingConfig = posConfig.trading;
   const entryPrice = decodePrice(trades[0].sqrtPriceX96, pool);
-  
-  let currentPosition = null;
-  const longTakeProfit = entryPrice * (1 + tradingConfig.longTakeProfitPercent/100);
-  const shortTakeProfit = entryPrice * (1 + tradingConfig.shortTakeProfitPercent/100);
+
+  // Initialize tracking for multiple positions
+  let currentPositions = {};
+
+  // Initialize each trading strategy
+  posConfig.trading.forEach((strategy) => {
+    currentPositions[`${strategy.positionType}_${strategy.entryPricePercent}`] =
+      null;
+  });
 
   for (let trade of trades) {
     if (trade.amountUSD < CONFIG.MIN_TRADE_USD) continue;
     const currentPrice = decodePrice(trade.sqrtPriceX96, pool);
-    const prices = calcPrices(trade);
 
-    // Check if we need to close existing position
-    if (currentPosition) {
+    // Check and close positions if needed
+    for (const strategy of posConfig.trading) {
+      const posKey = `${strategy.positionType}_${strategy.entryPricePercent}`;
+      const position = currentPositions[posKey];
+
+      if (!position) continue;
+
       let shouldClose = false;
-      if (currentPosition.type === 'long' && currentPrice >= currentPosition.takeProfit) {
-        shouldClose = true;
-      } else if (currentPosition.type === 'short' && currentPrice <= currentPosition.takeProfit) {
-        shouldClose = true;
+      const takeProfitPrice =
+        position.entryPrice * (1 + strategy.takeProfitPercent / 100);
+
+      if (strategy.positionType === "long") {
+        shouldClose = currentPrice >= takeProfitPrice;
+      } else {
+        // short
+        shouldClose = currentPrice <= takeProfitPrice;
+      }
+
+      // Check stop loss if configured
+      if (!shouldClose && strategy.stopLossPercent) {
+        const stopLossPrice =
+          strategy.positionType === "long"
+            ? position.entryPrice *
+              (1 - Math.abs(strategy.stopLossPercent) / 100)
+            : position.entryPrice *
+              (1 + Math.abs(strategy.stopLossPercent) / 100);
+
+        shouldClose =
+          strategy.positionType === "long"
+            ? currentPrice <= stopLossPrice
+            : currentPrice >= stopLossPrice;
       }
 
       if (shouldClose) {
-        const pnlPercent = currentPosition.type === 'long' 
-          ? ((currentPrice / currentPosition.entryPrice) - 1) * 100
-          : ((currentPosition.entryPrice / currentPrice) - 1) * 100;
-        
-        const exitAmount = currentPosition.entryAmount * (1 + pnlPercent/100);
-        
+        const pnlPercent =
+          strategy.positionType === "long"
+            ? (currentPrice / position.entryPrice - 1) * 100
+            : (position.entryPrice / currentPrice - 1) * 100;
+
+        const exitAmount = position.entryAmount * (1 + pnlPercent / 100);
+
         positions.push({
-          ...currentPosition,
+          ...position,
           closeTimestamp: trade.timestamp,
           closePrice: currentPrice,
           pnlPercent,
-          pnlUSD: exitAmount - currentPosition.entryAmount
+          pnlUSD: exitAmount - position.entryAmount,
+          closedBy: shouldClose ? "takeProfit" : "stopLoss",
         });
-        
-        currentPosition = null;
+
+        currentPositions[posKey] = null;
       }
     }
 
-    // Open new position if conditions are met
-    if (!currentPosition) {
-      if (currentPrice > entryPrice) {
-        currentPosition = {
-          type: 'long',
-          openTimestamp: trade.timestamp,
-          openPrice: currentPrice,
-          entryPrice: currentPrice,
-          entryAmount: initialPosition.amountUSD,
-          takeProfit: currentPrice * (1 + tradingConfig.longTakeProfitPercent/100)
-        };
-      } else if (currentPrice < shortTakeProfit) {
-        currentPosition = {
-          type: 'short',
-          openTimestamp: trade.timestamp,
-          openPrice: currentPrice,
-          entryPrice: currentPrice,
-          entryAmount: initialPosition.amountUSD,
-          takeProfit: currentPrice * (1 + tradingConfig.shortTakeProfitPercent/100)
-        };
+    // Check for opening new positions
+    for (const strategy of posConfig.trading) {
+      const posKey = `${strategy.positionType}_${strategy.entryPricePercent}`;
+
+      if (currentPositions[posKey]) continue;
+
+      const entryPriceTarget =
+        entryPrice * (1 + strategy.entryPricePercent / 100);
+      let shouldOpen = false;
+
+      if (strategy.positionType === "long") {
+        shouldOpen = currentPrice >= entryPriceTarget;
+      } else {
+        // short
+        shouldOpen = currentPrice <= entryPriceTarget;
+      }
+
+      if (shouldOpen) {
+        // Check if we already have a position opened at this timestamp
+        const existingPosition = positions.find(
+          (p) =>
+            p.openTimestamp === trade.timestamp &&
+            p.type === strategy.positionType
+        );
+
+        if (!existingPosition) {
+          currentPositions[posKey] = {
+            lpPositionId: lpPositionId,
+            type: strategy.positionType,
+            strategyConfig: { ...strategy },
+            openTimestamp: trade.timestamp,
+            openPrice: currentPrice,
+            entryPrice: currentPrice,
+            entryAmount: initialPosition.amountUSD,
+          };
+        }
       }
     }
   }
 
-  // Close any remaining position at last trade
-  if (currentPosition) {
-    const lastTrade = trades[trades.length - 1];
-    const lastPrice = decodePrice(lastTrade.sqrtPriceX96, pool);
-    
-    const pnlPercent = currentPosition.type === 'long'
-      ? ((lastPrice / currentPosition.entryPrice) - 1) * 100
-      : ((currentPosition.entryPrice / lastPrice) - 1) * 100;
-    
-    const exitAmount = currentPosition.entryAmount * (1 + pnlPercent/100);
+  // Close any remaining positions at last trade
+  const lastTrade = trades[trades.length - 1];
+  const lastPrice = decodePrice(lastTrade.sqrtPriceX96, pool);
+
+  for (const [posKey, position] of Object.entries(currentPositions)) {
+    if (!position) continue;
+
+    const pnlPercent =
+      position.type === "long"
+        ? (lastPrice / position.entryPrice - 1) * 100
+        : (position.entryPrice / lastPrice - 1) * 100;
+
+    const exitAmount = position.entryAmount * (1 + pnlPercent / 100);
 
     positions.push({
-      ...currentPosition,
+      ...position,
       closeTimestamp: lastTrade.timestamp,
       closePrice: lastPrice,
       pnlPercent,
-      pnlUSD: exitAmount - currentPosition.entryAmount
+      pnlUSD: exitAmount - position.entryAmount,
+      closedBy: "endOfPeriod",
     });
   }
 
@@ -395,13 +435,21 @@ async function simulateTrading(trades, posConfig, initialPosition, pool) {
 }
 
 function logTradingPosition(pos) {
-  log("  Type:", pos.type);
-  log("  Open timestamp:", new Date(pos.openTimestamp).toISOString());
-  log("  Close timestamp:", new Date(pos.closeTimestamp).toISOString());
-  log("  Open price:", pos.openPrice);
-  log("  Close price:", pos.closePrice);
-  log("  Entry amount:", pos.entryAmount);
-  log("  PnL (%):", pos.pnlPercent);
-  log("  PnL (USD):", pos.pnlUSD);
+  log("  Position Type:", pos.type);
+  log("  Strategy Config:");
+  log("    Entry Price %:", pos.strategyConfig.entryPricePercent);
+  log("    Take Profit %:", pos.strategyConfig.takeProfitPercent);
+  log("    Stop Loss %:", pos.strategyConfig.stopLossPercent || "None");
+  log("  Timing:");
+  log("    Opened:", new Date(pos.openTimestamp).toISOString());
+  log("    Closed:", new Date(pos.closeTimestamp).toISOString());
+  log("  Prices:");
+  log("    Entry:", pos.entryPrice);
+  log("    Exit:", pos.closePrice);
+  log("  Position Size:", pos.entryAmount, "USD");
+  log("  Results:");
+  log("    PnL %:", pos.pnlPercent.toFixed(2));
+  log("    PnL USD:", pos.pnlUSD.toFixed(2));
+  log("    Closed By:", pos.closedBy);
   log("-------------------");
 }
