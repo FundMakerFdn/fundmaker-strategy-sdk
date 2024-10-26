@@ -296,6 +296,63 @@ function logLPPosition(pos) {
 
 //simulateLP(CONFIG.position);
 
+function shouldClosePosition(position, currentPrice, strategy) {
+  const takeProfitPrice =
+    position.entryPrice * (1 + strategy.takeProfitPercent / 100);
+
+  // Check take profit
+  if (strategy.positionType === "long" && currentPrice >= takeProfitPrice) {
+    return "takeProfit";
+  }
+  if (strategy.positionType === "short" && currentPrice <= takeProfitPrice) {
+    return "takeProfit";
+  }
+
+  // Check stop loss if configured
+  if (strategy.stopLossPercent) {
+    const stopLossPrice =
+      strategy.positionType === "long"
+        ? position.entryPrice * (1 - Math.abs(strategy.stopLossPercent) / 100)
+        : position.entryPrice * (1 + Math.abs(strategy.stopLossPercent) / 100);
+
+    if (strategy.positionType === "long" && currentPrice <= stopLossPrice) {
+      return "stopLoss";
+    }
+    if (strategy.positionType === "short" && currentPrice >= stopLossPrice) {
+      return "stopLoss";
+    }
+  }
+
+  return false;
+}
+
+function calculatePnL(position, currentPrice) {
+  const pnlPercent =
+    position.type === "long"
+      ? (currentPrice / position.entryPrice - 1) * 100
+      : (position.entryPrice / currentPrice - 1) * 100;
+
+  const exitAmount = position.entryAmount * (1 + pnlPercent / 100);
+
+  return {
+    pnlPercent,
+    pnlUSD: exitAmount - position.entryAmount,
+  };
+}
+
+function shouldOpenPosition(strategy, currentPrice, lpEntryPrice) {
+  // Calculate entry target relative to LP entry price
+  const entryPriceTarget = lpEntryPrice * (1 + strategy.entryPricePercent / 100);
+
+  if (strategy.positionType === "long") {
+    // For long positions, current price should be above target
+    return currentPrice >= entryPriceTarget;
+  } else {
+    // For short positions, current price should be below target 
+    return currentPrice <= entryPriceTarget;
+  }
+}
+
 export async function simulateTrading(
   trades,
   posConfig,
@@ -303,148 +360,99 @@ export async function simulateTrading(
   pool,
   lpPositionId
 ) {
-  const positions = [];
-  const entryPrice = decodePrice(trades[0].sqrtPriceX96, pool);
+  if (!trades.length || !posConfig.trading?.length) {
+    return [];
+  }
 
-  // Initialize tracking for multiple positions
+  const positions = [];
+  // Use LP position entry price as reference
+  const lpEntryPrice = initialPosition.openPrice;
   let currentPositions = {};
 
-  // Initialize each trading strategy
+  // Initialize position tracking
   posConfig.trading.forEach((strategy) => {
     currentPositions[`${strategy.positionType}_${strategy.entryPricePercent}`] =
       null;
   });
 
-  for (let trade of trades) {
+  // Process each trade
+  for (const trade of trades) {
     if (trade.amountUSD < CONFIG.MIN_TRADE_USD) continue;
+
     const currentPrice = decodePrice(trade.sqrtPriceX96, pool);
 
-    // Check and close positions if needed
+    // Check existing positions for closure
     for (const strategy of posConfig.trading) {
       const posKey = `${strategy.positionType}_${strategy.entryPricePercent}`;
       const position = currentPositions[posKey];
 
       if (!position) continue;
 
-      let shouldClose = false;
-      const takeProfitPrice =
-        position.entryPrice * (1 + strategy.takeProfitPercent / 100);
-
-      if (strategy.positionType === "long") {
-        shouldClose = currentPrice >= takeProfitPrice;
-      } else {
-        // short
-        shouldClose = currentPrice <= takeProfitPrice;
-      }
-
-      // Check stop loss if configured
-      if (!shouldClose && strategy.stopLossPercent) {
-        const stopLossPrice =
-          strategy.positionType === "long"
-            ? position.entryPrice *
-              (1 - Math.abs(strategy.stopLossPercent) / 100)
-            : position.entryPrice *
-              (1 + Math.abs(strategy.stopLossPercent) / 100);
-
-        shouldClose =
-          strategy.positionType === "long"
-            ? currentPrice <= stopLossPrice
-            : currentPrice >= stopLossPrice;
-      }
-
-      if (shouldClose) {
-        const pnlPercent =
-          strategy.positionType === "long"
-            ? (currentPrice / position.entryPrice - 1) * 100
-            : (position.entryPrice / currentPrice - 1) * 100;
-
-        const exitAmount = position.entryAmount * (1 + pnlPercent / 100);
-
-        // Determine if closure was due to stop loss
-        const stopLossPrice = strategy.positionType === "long"
-          ? position.entryPrice * (1 - Math.abs(strategy.stopLossPercent) / 100)
-          : position.entryPrice * (1 + Math.abs(strategy.stopLossPercent) / 100);
-        
-        const isStopLoss = strategy.positionType === "long"
-          ? currentPrice <= stopLossPrice
-          : currentPrice >= stopLossPrice;
+      const closeReason = shouldClosePosition(position, currentPrice, strategy);
+      if (closeReason) {
+        const { pnlPercent, pnlUSD } = calculatePnL(position, currentPrice);
 
         positions.push({
           ...position,
           closeTimestamp: trade.timestamp,
           closePrice: currentPrice,
           pnlPercent,
-          pnlUSD: exitAmount - position.entryAmount,
-          closedBy: isStopLoss ? "stopLoss" : "takeProfit",
+          pnlUSD,
+          closedBy: closeReason,
         });
 
         currentPositions[posKey] = null;
       }
     }
 
-    // Check for opening new positions
-    for (const strategy of posConfig.trading) {
-      const posKey = `${strategy.positionType}_${strategy.entryPricePercent}`;
+    // Don't open new positions on the last trade
+    if (trade !== trades[trades.length - 1]) {
+      // Check for new position entries
+      for (const strategy of posConfig.trading) {
+        const posKey = `${strategy.positionType}_${strategy.entryPricePercent}`;
 
-      if (currentPositions[posKey]) continue;
+        if (currentPositions[posKey]) continue;
 
-      const entryPriceTarget =
-        entryPrice * (1 + strategy.entryPricePercent / 100);
-      let shouldOpen = false;
+        if (shouldOpenPosition(strategy, currentPrice, lpEntryPrice)) {
+          // Prevent positions opening in same timestamp as other opens/closes
+          const hasPositionActivity = positions.some(
+            (p) => p.openTimestamp === trade.timestamp || p.closeTimestamp === trade.timestamp
+          );
 
-      if (strategy.positionType === "long") {
-        shouldOpen = currentPrice >= entryPriceTarget;
-      } else {
-        // short
-        shouldOpen = currentPrice <= entryPriceTarget;
-      }
-
-      if (shouldOpen) {
-        // Check if we already have a position opened at this timestamp
-        const existingPosition = positions.find(
-          (p) =>
-            p.openTimestamp === trade.timestamp &&
-            p.type === strategy.positionType
-        );
-
-        if (!existingPosition) {
-          currentPositions[posKey] = {
-            lpPositionId: lpPositionId,
-            type: strategy.positionType,
-            strategyConfig: { ...strategy },
-            openTimestamp: trade.timestamp,
-            openPrice: currentPrice,
-            entryPrice: currentPrice,
-            entryAmount: initialPosition.amountUSD,
-          };
+          if (!hasPositionActivity) {
+            currentPositions[posKey] = {
+              lpPositionId,
+              type: strategy.positionType,
+              strategyConfig: { ...strategy },
+              openTimestamp: trade.timestamp,
+              openPrice: currentPrice,
+              entryPrice: currentPrice,
+              entryAmount: initialPosition.amountUSD,
+            };
+          }
         }
       }
     }
   }
 
-  // Close any remaining positions at last trade
+  // Close remaining positions at end of period
   const lastTrade = trades[trades.length - 1];
   const lastPrice = decodePrice(lastTrade.sqrtPriceX96, pool);
 
-  for (const [posKey, position] of Object.entries(currentPositions)) {
-    if (!position) continue;
+  Object.entries(currentPositions).forEach(([_, position]) => {
+    if (!position) return;
 
-    const pnlPercent =
-      position.type === "long"
-        ? (lastPrice / position.entryPrice - 1) * 100
-        : (position.entryPrice / lastPrice - 1) * 100;
-
-    const exitAmount = position.entryAmount * (1 + pnlPercent / 100);
+    const { pnlPercent, pnlUSD } = calculatePnL(position, lastPrice);
 
     positions.push({
       ...position,
       closeTimestamp: lastTrade.timestamp,
       closePrice: lastPrice,
       pnlPercent,
-      pnlUSD: exitAmount - position.entryAmount,
+      pnlUSD,
       closedBy: "endOfPeriod",
     });
-  }
+  });
 
   return positions;
 }
