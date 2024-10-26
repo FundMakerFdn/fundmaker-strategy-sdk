@@ -296,7 +296,13 @@ function logLPPosition(pos) {
 
 //simulateLP(CONFIG.position);
 
-async function simulateTrading(trades, posConfig, initialPosition, pool, lpPositionId) {
+export async function simulateTrading(
+  trades,
+  posConfig,
+  initialPosition,
+  pool,
+  lpPositionId
+) {
   const positions = [];
   const entryPrice = decodePrice(trades[0].sqrtPriceX96, pool);
 
@@ -354,13 +360,22 @@ async function simulateTrading(trades, posConfig, initialPosition, pool, lpPosit
 
         const exitAmount = position.entryAmount * (1 + pnlPercent / 100);
 
+        // Determine if closure was due to stop loss
+        const stopLossPrice = strategy.positionType === "long"
+          ? position.entryPrice * (1 - Math.abs(strategy.stopLossPercent) / 100)
+          : position.entryPrice * (1 + Math.abs(strategy.stopLossPercent) / 100);
+        
+        const isStopLoss = strategy.positionType === "long"
+          ? currentPrice <= stopLossPrice
+          : currentPrice >= stopLossPrice;
+
         positions.push({
           ...position,
           closeTimestamp: trade.timestamp,
           closePrice: currentPrice,
           pnlPercent,
           pnlUSD: exitAmount - position.entryAmount,
-          closedBy: shouldClose ? "takeProfit" : "stopLoss",
+          closedBy: isStopLoss ? "stopLoss" : "takeProfit",
         });
 
         currentPositions[posKey] = null;

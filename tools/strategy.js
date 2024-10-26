@@ -163,14 +163,6 @@ async function writeOutputCSV(results, outputDir) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
-  // Create separate directories for LP and trading positions
-  const lpOutputDir = path.join(outputDir, "lp");
-  const tradesOutputDir = path.join(outputDir, "trades");
-  [lpOutputDir, tradesOutputDir].forEach((dir) => {
-    if (!fs.existsSync(dir)) {
-      fs.mkdirSync(dir, { recursive: true });
-    }
-  });
 
   for (const result of results) {
     const { strategyName, poolType, poolAddress, lpPositions } = result;
@@ -185,7 +177,7 @@ async function writeOutputCSV(results, outputDir) {
 
     do {
       fileName = `${strategyName}_${token0}${token1}_${pool.id}_${poolType}_${increment}.csv`;
-      filePath = path.join(lpOutputDir, fileName); // Always save LP positions to lpOutputDir
+      filePath = path.join(outputDir, fileName); // Write directly to output directory
       increment++;
     } while (fs.existsSync(filePath));
 
