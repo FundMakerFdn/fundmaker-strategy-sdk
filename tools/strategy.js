@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { program } from "commander";
 import { parse, format } from "fast-csv";
-import { simulatePosition } from "#src/simulate.js";
+import { simulateLP } from "#src/simulate.js";
 import db from "#src/database.js";
 import { trades } from "#src/schema.js";
 import { eq, and, gte } from "drizzle-orm";
@@ -127,10 +127,11 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
     positions.push(position);
   }
 
-  let positionsSim = [];
+  let allLPPositions = [];
+  let allTradingPositions = [];
+  
   for (let position of positions) {
-    // Simulate position using simulatePosition
-    const simulationResults = await simulatePosition({
+    const simulationResults = await simulateLP({
       poolType: pool.type,
       poolAddress: pool.address,
       openTime: new Date(position.openTimestamp),
@@ -140,15 +141,21 @@ async function executeStrategy(db, pool, startDate, endDate, strategy) {
       fullRange: strategy?.priceRange?.fullRange,
       amountUSD: strategy.amountUSD || CONFIG.DEFAULT_POS_USD,
       positionOpenDays: strategy.positionOpenDays,
+      trading: strategy.trading, // Make sure trading config is passed through
     });
 
     if (simulationResults) {
-      console.log(`Simulated ${simulationResults.length} positions`);
-      positionsSim.push(simulationResults);
+      allLPPositions.push(simulationResults.lpPositions);
+      if (simulationResults.tradingPositions) {
+        allTradingPositions = allTradingPositions.concat(simulationResults.tradingPositions);
+      }
     }
   }
 
-  return positionsSim;
+  return {
+    lpPositions: allLPPositions,
+    tradingPositions: allTradingPositions
+  };
 }
 
 // Writing CSV output using fast-csv
@@ -157,20 +164,31 @@ async function writeOutputCSV(results, outputDir) {
     fs.mkdirSync(outputDir, { recursive: true });
   }
 
+  // Create separate directories for LP and trading positions
+  const lpOutputDir = path.join(outputDir, 'lp');
+  const tradesOutputDir = path.join(outputDir, 'trades');
+  [lpOutputDir, tradesOutputDir].forEach(dir => {
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+  });
+
   for (const result of results) {
-    const { strategyName, poolType, poolAddress, positions } = result;
+    const { strategyName, poolType, poolAddress, lpPositions, tradingPositions } = result;
     const pool = await getPoolMetadata(poolType, poolAddress);
     const token0 = pool.token0Symbol;
     const token1 = pool.token1Symbol;
+    
     let positionId = 1;
 
+    // Write LP positions
     let increment = 1;
     let fileName;
     let filePath;
 
     do {
       fileName = `${strategyName}_${token0}${token1}_${pool.id}_${poolType}_${increment}.csv`;
-      filePath = path.join(outputDir, fileName);
+      filePath = path.join(lpOutputDir, fileName);  // Always save LP positions to lpOutputDir
       increment++;
     } while (fs.existsSync(filePath));
 
@@ -179,7 +197,7 @@ async function writeOutputCSV(results, outputDir) {
 
     csvStream.pipe(writableStream);
 
-    positions.forEach((positionSet) => {
+    lpPositions.forEach((positionSet) => {
       positionSet.forEach((position) => {
         csvStream.write({
           poolType: position.poolType,
@@ -201,6 +219,40 @@ async function writeOutputCSV(results, outputDir) {
     csvStream.end();
 
     console.log(`Results written to ${filePath}`);
+
+    // Add separate CSV writing for trading positions
+    if (result.tradingPositions.length > 0) {
+      let increment = 1;
+      let fileName;
+      let filePath;
+
+      do {
+        fileName = `${result.strategyName}_${token0}${token1}_${pool.id}_trades_${increment}.csv`;
+        filePath = path.join(tradesOutputDir, fileName);
+        increment++;
+      } while (fs.existsSync(filePath));
+
+      const csvStream = format({ headers: true });
+      const writableStream = fs.createWriteStream(filePath);
+
+      csvStream.pipe(writableStream);
+
+      result.tradingPositions.forEach((trade) => {
+        csvStream.write({
+          type: trade.type,
+          openTimestamp: new Date(trade.openTimestamp).toISOString(),
+          closeTimestamp: new Date(trade.closeTimestamp).toISOString(),
+          openPrice: trade.openPrice,
+          closePrice: trade.closePrice,
+          entryAmount: trade.entryAmount,
+          pnlPercent: trade.pnlPercent,
+          pnlUSD: trade.pnlUSD
+        });
+      });
+
+      csvStream.end();
+      console.log(`Trade results written to ${filePath}`);
+    }
   }
 }
 
@@ -235,24 +287,46 @@ async function main(opts) {
         }
       }
 
-      const positions = await executeStrategy(
+      const { lpPositions, tradingPositions } = await executeStrategy(
         db,
         pool,
         startDate,
         endDate,
         strategy
       );
-      const pnlArr = positions.flat().map((p) => p.pnlPercent);
-      const avgPnL = pnlArr.reduce((a, r) => a + r, 0) / pnlArr.length;
-      const std = calculateStandardDeviation(pnlArr);
-      const sharpe = std !== 0 ? avgPnL / std : 0;
+
+      // Calculate LP statistics
+      const lpPnlArr = lpPositions.flat().map((p) => p.pnlPercent);
+      const lpAvgPnL = lpPnlArr.length 
+        ? lpPnlArr.reduce((a, r) => a + (r || 0), 0) / lpPnlArr.length 
+        : 0;
+      const lpStd = calculateStandardDeviation(lpPnlArr.filter(x => !isNaN(x)));
+      const lpSharpe = lpStd !== 0 ? lpAvgPnL / lpStd : 0;
+
+      // Calculate trading statistics
+      const tradePnlArr = tradingPositions.map((t) => t.pnlPercent);
+      const totalTradingPnLUSD = tradingPositions.reduce((sum, t) => sum + (t.pnlUSD || 0), 0);
+      const totalTradingPnLPercent = tradingPositions.length 
+        ? (totalTradingPnLUSD / (strategy.amountUSD || CONFIG.DEFAULT_POS_USD)) * 100 
+        : 0;
+      const tradeStd = calculateStandardDeviation(tradePnlArr.filter(x => !isNaN(x)));
+      const tradeSharpe = tradeStd !== 0 ? totalTradingPnLPercent / tradeStd : 0;
+
       results.push({
         strategyName: strategy.strategyName,
         poolType: poolRow.poolType,
         poolAddress: poolRow.poolAddress,
-        positions: positions,
-        avgPnL,
-        sharpe,
+        lpPositions: lpPositions,
+        tradingPositions: tradingPositions,
+        lpStats: {
+          avgPnL: lpAvgPnL,
+          sharpe: lpSharpe,
+        },
+        tradeStats: {
+          totalPnLUSD: totalTradingPnLUSD,
+          totalPnLPercent: totalTradingPnLPercent,
+          sharpe: tradeSharpe,
+        }
       });
     }
   }
@@ -260,14 +334,18 @@ async function main(opts) {
   // Write results to output CSVs using fast-csv
   await writeOutputCSV(results, opts.output);
 
-  // Log summary statistics
+  // Log summary statistics with corrected trading metrics
   results.forEach((result) => {
     console.log(
       `Strategy: ${result.strategyName}, Pool: ${result.poolAddress}`
     );
-    console.log("Total positions:", result.positions.length);
-    console.log("Average PnL %:", result.avgPnL);
-    console.log("Sharpe ratio:", result.sharpe);
+    console.log("LP Positions:", result.lpPositions.length);
+    console.log("LP Average PnL %:", result.lpStats.avgPnL.toFixed(2));
+    console.log("LP Sharpe ratio:", result.lpStats.sharpe.toFixed(2));
+    console.log("Trading Positions:", result.tradingPositions.length);
+    console.log("Trading Total PnL USD:", result.tradeStats.totalPnLUSD.toFixed(2));
+    console.log("Trading Total PnL %:", result.tradeStats.totalPnLPercent.toFixed(2));
+    console.log("Trading Sharpe ratio:", result.tradeStats.sharpe.toFixed(2));
     console.log("---");
   });
 }
