@@ -75,7 +75,7 @@ async function processData(data, strategy) {
 
       log(`PNL Percent LP: ${pnlPercentLP}%`);
       log(`Trading Positions: ${tradingPositions.length}`);
-      
+
       // Log trading positions
       tradingPositions.forEach((pos, index) => {
         log(`Trading Position ${index + 1}:`);
@@ -302,13 +302,25 @@ async function processData(data, strategy) {
         pnlPercentLP + (pnlOptionsUSD / record.amountUSD) * 100;
 
       delete record.pnlPercent;
-      fileResults.push({
+
+      // Separate options and trading results
+      const optionsResult = {
         ...record,
         options: updatedOptions,
         pnlPercentLP,
         pnlOptionsUSD,
         pnlOptionsPercent,
         pnlTotalPercent,
+      };
+
+      const tradingResult = {
+        ...record,
+        tradingPositions: record.tradingPositions || [],
+      };
+
+      fileResults.push({
+        options: optionsResult,
+        trading: tradingResult,
       });
     }
 
@@ -373,14 +385,18 @@ function writeResults(results, strategy, outputPath) {
     const optionsOutput = {
       strategy: strategy.name,
       originalFile: file,
-      results: fileResults,
+      results: fileResults.map((result) => {
+        const optionsResult = {...result.options};
+        delete optionsResult.tradingPositions;
+        return optionsResult;
+      }),
     };
     fs.writeFileSync(outputFilePath, JSON.stringify(optionsOutput, null, 2));
     console.log(`Options results written to ${outputFilePath}`);
 
     // Write trading positions to CSV
-    const tradingPositions = fileResults.flatMap(result => 
-      (result.tradingPositions || []).map(pos => ({
+    const tradingPositions = fileResults.flatMap((result) =>
+      result.trading.tradingPositions.map((pos) => ({
         lpPositionId: pos.lpPositionId,
         type: pos.type,
         openTimestamp: new Date(pos.openTimestamp).toISOString(),
@@ -390,19 +406,22 @@ function writeResults(results, strategy, outputPath) {
         entryAmount: pos.entryAmount,
         pnlPercent: pos.pnlPercent,
         pnlUSD: pos.pnlUSD,
-        closedBy: pos.closedBy
+        closedBy: pos.closedBy,
       }))
     );
 
     if (tradingPositions.length > 0) {
-      const tradesFileName = `${strategy.strategyName}_${path.basename(file, ".csv")}_trades_${increment}.csv`;
+      const tradesFileName = `${strategy.strategyName}_${path.basename(
+        file,
+        ".csv"
+      )}_trades_${increment}.csv`;
       const tradesFilePath = path.join(tradesOutputDir, tradesFileName);
-      
-      const csvHeader = Object.keys(tradingPositions[0]).join(',') + '\n';
-      const csvRows = tradingPositions.map(pos => 
-        Object.values(pos).join(',')
-      ).join('\n');
-      
+
+      const csvHeader = Object.keys(tradingPositions[0]).join(",") + "\n";
+      const csvRows = tradingPositions
+        .map((pos) => Object.values(pos).join(","))
+        .join("\n");
+
       fs.writeFileSync(tradesFilePath, csvHeader + csvRows);
       console.log(`Trading results written to ${tradesFilePath}`);
     }

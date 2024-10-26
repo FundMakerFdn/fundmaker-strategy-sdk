@@ -42,7 +42,7 @@
       {
         "positionType": "long",
         "entryPricePercent": 0,
-        "takeProfitPercent": 5,
+        "takeProfitPercent": 1,
         "stopLossPercent": -1
       },
       {

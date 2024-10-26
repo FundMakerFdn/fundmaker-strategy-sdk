@@ -342,13 +342,14 @@ function calculatePnL(position, currentPrice) {
 
 function shouldOpenPosition(strategy, currentPrice, lpEntryPrice) {
   // Calculate entry target relative to LP entry price
-  const entryPriceTarget = lpEntryPrice * (1 + strategy.entryPricePercent / 100);
+  const entryPriceTarget =
+    lpEntryPrice * (1 + strategy.entryPricePercent / 100);
 
   if (strategy.positionType === "long") {
     // For long positions, current price should be above target
     return currentPrice >= entryPriceTarget;
   } else {
-    // For short positions, current price should be below target 
+    // For short positions, current price should be below target
     return currentPrice <= entryPriceTarget;
   }
 }
@@ -416,7 +417,9 @@ export async function simulateTrading(
         if (shouldOpenPosition(strategy, currentPrice, lpEntryPrice)) {
           // Prevent positions opening in same timestamp as other opens/closes
           const hasPositionActivity = positions.some(
-            (p) => p.openTimestamp === trade.timestamp || p.closeTimestamp === trade.timestamp
+            (p) =>
+              p.openTimestamp === trade.timestamp ||
+              p.closeTimestamp === trade.timestamp
           );
 
           if (!hasPositionActivity) {
