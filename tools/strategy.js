@@ -389,27 +389,31 @@ async function main(opts) {
     console.log("LP Positions:", result.lpPositions.length);
     console.log("LP Average PnL %:", result.lpStats.avgPnL.toFixed(2));
     console.log("LP Sharpe ratio:", result.lpStats.sharpe.toFixed(2));
-    console.log("\nTrading Statistics:");
-    console.log("Long Positions:", result.tradeStats.long.count);
-    console.log("  Average PnL %:", result.tradeStats.long.avgPnL.toFixed(2));
-    console.log(
-      "  Total PnL USD:",
-      result.tradeStats.long.totalPnLUSD.toFixed(2)
-    );
-    console.log("  Sharpe Ratio:", result.tradeStats.long.sharpe.toFixed(2));
-    console.log("Short Positions:", result.tradeStats.short.count);
-    console.log("  Average PnL %:", result.tradeStats.short.avgPnL.toFixed(2));
-    console.log(
-      "  Total PnL USD:",
-      result.tradeStats.short.totalPnLUSD.toFixed(2)
-    );
-    console.log("  Sharpe Ratio:", result.tradeStats.short.sharpe.toFixed(2));
-    console.log("Combined Trading:");
-    console.log("  Total PnL USD:", result.tradeStats.total.pnlUSD.toFixed(2));
-    console.log(
-      "  Total PnL %:",
-      result.tradeStats.total.pnlPercent.toFixed(2)
-    );
+    
+    // Only show trading statistics if there were any trades
+    if (result.tradingPositions && result.tradingPositions.length > 0) {
+      console.log("\nTrading Statistics:");
+      console.log("Long Positions:", result.tradeStats.long.count);
+      console.log("  Average PnL %:", result.tradeStats.long.avgPnL.toFixed(2));
+      console.log(
+        "  Total PnL USD:",
+        result.tradeStats.long.totalPnLUSD.toFixed(2)
+      );
+      console.log("  Sharpe Ratio:", result.tradeStats.long.sharpe.toFixed(2));
+      console.log("Short Positions:", result.tradeStats.short.count);
+      console.log("  Average PnL %:", result.tradeStats.short.avgPnL.toFixed(2));
+      console.log(
+        "  Total PnL USD:",
+        result.tradeStats.short.totalPnLUSD.toFixed(2)
+      );
+      console.log("  Sharpe Ratio:", result.tradeStats.short.sharpe.toFixed(2));
+      console.log("Combined Trading:");
+      console.log("  Total PnL USD:", result.tradeStats.total.pnlUSD.toFixed(2));
+      console.log(
+        "  Total PnL %:",
+        result.tradeStats.total.pnlPercent.toFixed(2)
+      );
+    }
     console.log("---");
   });
 }
